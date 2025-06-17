@@ -1,4 +1,4 @@
-var filename = 'sealdice-js-ext.js'
+var filename = 'daggerheart 二元骰插件.js'
 
 module.exports = {
   dev: {

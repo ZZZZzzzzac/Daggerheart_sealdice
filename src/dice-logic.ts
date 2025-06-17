@@ -13,10 +13,6 @@ export function randomNum(minNum: number, maxNum?: number): number {
     return Math.floor(Math.random() * (maxNum - minNum + 1)) + minNum;
 }
 
-// 定义优势/劣势的同义词列表
-const advantageKeywords = ['adv', 'a', '优势', '优'];
-const disadvantageKeywords = ['dis', 'd', '劣势', '劣'];
-
 export interface DiceRollResult {
     hope: number;
     fear: number;
@@ -51,72 +47,76 @@ export function parseArgsAndRoll(args: string[], userName: string): DiceRollResu
         return true;
     });
 
-    // 解析参数
-    for (let arg of filteredArgs) {
+    const mathArgs: string[] = [];
+
+    // 分离出优势/劣势参数
+    const remainingArgs = filteredArgs.filter(arg => {
         arg = arg.toLowerCase();
-        // 检查是否是带数字的优势/劣势
-        const advMatch = arg.match(/^(adv|a|优势|优)(\d+)$/);
-        const disMatch = arg.match(/^(dis|d|劣势|劣)(\d+)$/);
+        const advMatch = arg.match(/^(adv|优势|优)(\d*)$/);
+        const disMatch = arg.match(/^(dis|劣势|劣)(\d*)$/);
 
         if (advMatch) {
-            const numDice = parseInt(advMatch[2]);
+            const numDiceStr = advMatch[2] || '1';
+            const numDice = parseInt(numDiceStr);
             const rolls: number[] = [];
             for (let i = 0; i < numDice; i++) {
                 rolls.push(randomNum(6));
             }
             adv_dis = Math.max(...rolls);
             advDisResult = `优势骰${numDice}个: [${rolls.join(', ')}] 取最高:${adv_dis}`;
+            return false;
         } else if (disMatch) {
-            const numDice = parseInt(disMatch[2]);
+            const numDiceStr = disMatch[2] || '1';
+            const numDice = parseInt(numDiceStr);
             const rolls: number[] = [];
             for (let i = 0; i < numDice; i++) {
                 rolls.push(randomNum(6));
             }
             adv_dis = -1 * Math.max(...rolls);
             advDisResult = `劣势骰${numDice}个: [${rolls.join(', ')}] 取最高:${-adv_dis}`;
-        } else if (advantageKeywords.includes(arg)) {
-            const roll = randomNum(6);
-            adv_dis = roll;
-            advDisResult = `优势骰: ${roll}`;
-        } else if (disadvantageKeywords.includes(arg)) {
-            const roll = randomNum(6);
-            adv_dis = -1 * roll;
-            advDisResult = `劣势骰: ${roll}`;
-        } else {
-            // 尝试解析为数字或随机值表达式
-            let sign = 1;
-            if (arg.startsWith('+')) {
-                arg = arg.substring(1); // 移除加号
-            } else if (arg.startsWith('-')) {
-                sign = -1;
-                arg = arg.substring(1); // 移除减号
+            return false;
+        }
+        mathArgs.push(arg);
+        return true;
+    });
+
+    // 处理数学表达式
+    const mathExpression = mathArgs.join('').toLowerCase();
+    const regex = /([+-])?(\d*d\d+|\d+)/g;
+    let match;
+
+    while ((match = regex.exec(mathExpression)) !== null) {
+        const sign = match[1] === '-' ? -1 : 1;
+        let term = match[2];
+
+        // 处理 dX 格式
+        if (term.startsWith('d')) {
+            term = '1' + term;
+        }
+
+        const diceMatch = term.match(/^(\d+)d(\d+)$/);
+        if (diceMatch) {
+            const numDice = parseInt(diceMatch[1]);
+            const diceSize = parseInt(diceMatch[2]);
+            const rolls: number[] = [];
+            let sum = 0;
+            for (let i = 0; i < numDice; i++) {
+                const roll = randomNum(diceSize);
+                rolls.push(roll);
+                sum += roll;
             }
-            // 检查是否是随机值表达式 (如 1d6)
-            const diceMatch = arg.match(/^(\d+)d(\d+)$/);
-            if (diceMatch) {
-                const numDice = parseInt(diceMatch[1]);
-                const diceSize = parseInt(diceMatch[2]);
-                const rolls: number[] = [];
-                let sum = 0;
-                for (let i = 0; i < numDice; i++) {
-                    const roll = randomNum(diceSize);
-                    rolls.push(roll);
-                    sum += roll;
-                }
-                modifier += sign * sum;
-                diceResults.push(`${sign === 1 ? '+' : '-'}${numDice}d${diceSize}: [${rolls.join(', ')}]`);
-            } else {
-                // 如果不是随机值表达式，尝试解析为普通数字
-                const num = parseInt(arg);
-                if (!isNaN(num)) {
-                    modifier += sign * num;
-                }
+            modifier += sign * sum;
+            diceResults.push(`${sign === 1 ? '+' : '-'}${term}: [${rolls.join(', ')}]`);
+        } else {
+            const num = parseInt(term);
+            if (!isNaN(num)) {
+                modifier += sign * num;
             }
         }
     }
 
     const value = hope + fear + adv_dis + modifier;
-    const diceResultStr = diceResults.length > 0 ? '\n 调整值结果: ' + diceResults.join(' ') : '';
+    const diceResultStr = diceResults.length > 0 ? '\n随机调整值结果: ' + diceResults.join(' ') : '';
 
     // 生成回复
     let reply = `Alea iacta est【${userName}】已掷下骰子...\n`;

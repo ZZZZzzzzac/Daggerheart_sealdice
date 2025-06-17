@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DualityDice
 // @author       RO/zac
-// @version      1.7.0
+// @version      1.8.0
 // @description  Daggerheart二元骰专用模式 使用方法：.dd adv/dis(优劣势) +调整值，如.dd adv +4。设置两枚十二面骰子，分别命名为hope和fear，同时掷出，将所得数值相加，结果为value。然后对比hope和fear的大小，若hope大于fear，输出value with hope；若fear大于hope，输出value with fear，若hope等于fear，输出critical success
 // @timestamp    1671368035
 // 2025-05-05

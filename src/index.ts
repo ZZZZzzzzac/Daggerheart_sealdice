@@ -4,7 +4,7 @@ function main() {
   // 注册扩展
   let ext = seal.ext.find('daggerheart');
   if (!ext) {
-    ext = seal.ext.new('daggerheart', 'Daggerheart', '1.0.0');
+    ext = seal.ext.new('daggerheart', 'Daggerheart', '1.8.0');
     seal.ext.register(ext);
   }
 
