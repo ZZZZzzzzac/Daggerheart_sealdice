@@ -8,6 +8,8 @@ function main() {
     seal.ext.register(ext);
   }
 
+  const actionData: { [key: string]: { name: string, count: number } } = {};
+
   // 编写指令
   const cmdDaggerheart = seal.ext.newCmdItemInfo();
   cmdDaggerheart.name = 'dd'; // 指令名字
@@ -15,32 +17,54 @@ function main() {
     '基础用法：.dd [adv/dis] [固定调整值:+/-N] [随机调整值:+/-XdY]\n' +
     '多个优/劣势骰取高：.dd adv2/dis2 (数字表示骰子数量)\n' +
     '优劣势可简写：优势:[adv/a/优势/优] 劣势:[dis/d/劣势/劣]\n' +
-    '组合使用可以任意顺序：.dd 1d6 a3 +4\n';
+    '组合使用可以任意顺序：.dd 1d6 a3 +4\n' +
+    'DC检定: .dd [DC]\n' +
+    '.dd getAction //查询当前所有用户掷骰的次数\n' +
+    '.dd clearAction //重置记录\n';
 
   cmdDaggerheart.solve = (ctx, msg, cmdArgs) => {
-    if (cmdArgs.args.length === 1 && cmdArgs.args[0].toLowerCase() === 'help') {
-      const ret = seal.ext.newCmdExecuteResult(true);
-      ret.showHelp = true;
-      return ret;
+    const userId = ctx.player.userId;
+    const userName = ctx.player.name;
+
+    if (cmdArgs.args.length === 1) {
+      const action = cmdArgs.args[0].toLowerCase();
+      if (action === 'help') {
+        const ret = seal.ext.newCmdExecuteResult(true);
+        ret.showHelp = true;
+        return ret;
+      }
+
+      if (action === 'getaction') {
+        let reply = '当前掷骰次数记录:\n';
+        if (Object.keys(actionData).length === 0) {
+          reply += '暂无记录。';
+        } else {
+          for (const id in actionData) {
+            reply += `${actionData[id].name}: ${actionData[id].count}次\n`;
+          }
+        }
+        seal.replyToSender(ctx, msg, reply);
+        return seal.ext.newCmdExecuteResult(true);
+      }
+
+      if (action === 'clearaction') {
+        for (const key in actionData) {
+          delete actionData[key];
+        }
+        seal.replyToSender(ctx, msg, '所有用户的掷骰次数记录已重置。');
+        return seal.ext.newCmdExecuteResult(true);
+      }
     }
 
-    const result = parseArgsAndRoll(cmdArgs.args);
-    const { hope, fear, value, modifier, diceResultStr, advDisResult } = result;
-    const ctxname = ctx.player.name;
-
-    let reply = `Alea iacta est【${ctxname}】已掷下骰子...\n`;
-    reply += `希望骰:${hope} 恐惧骰:${fear} ${advDisResult} 调整值:${modifier}${diceResultStr}\n`;
-    reply += `骰值总和:${value} `;
-
-    if (hope > fear) {
-      reply += '希望尚存...';
-    } else if (hope < fear) {
-      reply += '直面恐惧...';
-    } else {
-      reply += '关键成功，逆天改命!';
+    // 记录掷骰次数
+    if (!actionData[userId]) {
+      actionData[userId] = { name: userName, count: 0 };
     }
+    actionData[userId].name = userName; // 每次都更新名字，防止用户改名
+    actionData[userId].count++;
 
-    seal.replyToSender(ctx, msg, reply);
+    const result = parseArgsAndRoll(cmdArgs.args, userName);
+    seal.replyToSender(ctx, msg, result.reply);
     return seal.ext.newCmdExecuteResult(true);
   };
 

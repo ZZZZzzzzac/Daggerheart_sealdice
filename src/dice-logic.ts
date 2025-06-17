@@ -25,6 +25,7 @@ export interface DiceRollResult {
     modifier: number;
     diceResultStr: string;
     advDisResult: string;
+    reply: string;
 }
 
 /**
@@ -32,16 +33,26 @@ export interface DiceRollResult {
  * @param args - 从命令中解析的参数数组。
  * @returns 返回一个包含所有骰子结果的对象。
  */
-export function parseArgsAndRoll(args: string[]): DiceRollResult {
+export function parseArgsAndRoll(args: string[], userName: string): DiceRollResult {
     let hope = randomNum(12);
     let fear = randomNum(12);
     let adv_dis = 0;
     let modifier = 0;
     let diceResults: string[] = []; // 用于存储所有随机骰子的结果
     let advDisResult = ''; // 用于存储优劣势骰的结果
+    let dc: number | null = null;
+
+    const filteredArgs = args.filter(arg => {
+        const dcMatch = arg.match(/^\[(\d+)\]$/);
+        if (dcMatch) {
+            dc = parseInt(dcMatch[1], 10);
+            return false; // 从参数列表中移除DC
+        }
+        return true;
+    });
 
     // 解析参数
-    for (let arg of args) {
+    for (let arg of filteredArgs) {
         arg = arg.toLowerCase();
         // 检查是否是带数字的优势/劣势
         const advMatch = arg.match(/^(adv|a|优势|优)(\d+)$/);
@@ -107,6 +118,34 @@ export function parseArgsAndRoll(args: string[]): DiceRollResult {
     const value = hope + fear + adv_dis + modifier;
     const diceResultStr = diceResults.length > 0 ? '\n 调整值结果: ' + diceResults.join(' ') : '';
 
+    // 生成回复
+    let reply = `Alea iacta est【${userName}】已掷下骰子...\n`;
+    reply += `希望骰:${hope} 恐惧骰:${fear} ${advDisResult} 调整值:${modifier}${diceResultStr}\n`;
+    
+    if (dc !== null) {
+        reply += `骰值总和:${value} / DC:${dc} `;
+    } else {
+        reply += `骰值总和:${value} `;
+    }
+
+    // 决定结果
+    if (hope === fear) {
+        reply += '关键成功，逆天改命!';
+    } else if (dc !== null) {
+        const success = value >= dc;
+        if (hope > fear) {
+            reply += success ? '希望成功' : '希望失败';
+        } else { // hope < fear
+            reply += success ? '恐惧成功' : '恐惧失败';
+        }
+    } else { // 无DC检定
+        if (hope > fear) {
+            reply += '希望尚存...';
+        } else { // hope < fear
+            reply += '直面恐惧...';
+        }
+    }
+
     return {
         hope,
         fear,
@@ -115,5 +154,6 @@ export function parseArgsAndRoll(args: string[]): DiceRollResult {
         modifier,
         diceResultStr,
         advDisResult,
+        reply,
     };
 }
