@@ -16,7 +16,7 @@ function main() {
   cmdDaggerheart.help = 'Daggerheart二元骰专用模式\n' +
     '基础用法：.dd [adv/dis] [固定调整值:+/-N] [随机调整值:+/-XdY]\n' +
     '多个优/劣势骰取高：.dd adv2/dis2 (数字表示骰子数量)\n' +
-    '优劣势可简写：优势:[adv/a/优势/优] 劣势:[dis/d/劣势/劣]\n' +
+    '优劣势可简写：优势:[adv/优势/优] 劣势:[dis/劣势/劣]\n' +
     '组合使用可以任意顺序：.dd 1d6 a3 +4\n' +
     'DC检定: .dd [DC]\n' +
     '.dd getAction //查询当前所有用户掷骰的次数\n' +
