@@ -1,4 +1,4 @@
-import { parseArgsAndRoll } from './dice-logic';
+import { parseArgsAndRoll, calculateFeastRoll } from './dice-logic';
 
 function main() {
   // 注册扩展
@@ -19,6 +19,7 @@ function main() {
     '优劣势可简写：优势:[adv/优势/优] 劣势:[dis/劣势/劣]\n' +
     '组合使用可以任意顺序：.dd 1d6 a3 +4\n' +
     'DC检定: .dd [DC]\n' +
+    '迷宫饭: .dd feast 4d8 2d6 3d12\n' +
     '.dd getAction //查询当前所有用户掷骰的次数\n' +
     '.dd clearAction //重置记录\n';
 
@@ -26,12 +27,19 @@ function main() {
     const userId = ctx.player.userId;
     const userName = ctx.player.name;
 
-    if (cmdArgs.args.length === 1) {
+    if (cmdArgs.args.length > 0) {
       const action = cmdArgs.args[0].toLowerCase();
       if (action === 'help') {
         const ret = seal.ext.newCmdExecuteResult(true);
         ret.showHelp = true;
         return ret;
+      }
+
+      if (action === 'feast') {
+        const feastArgs = cmdArgs.args.slice(1);
+        const result = calculateFeastRoll(feastArgs, userName);
+        seal.replyToSender(ctx, msg, result.reply);
+        return seal.ext.newCmdExecuteResult(true);
       }
 
       if (action === 'getaction') {

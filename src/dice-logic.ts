@@ -157,3 +157,107 @@ export function parseArgsAndRoll(args: string[], userName: string): DiceRollResu
         reply,
     };
 }
+export interface FeastRollResult {
+    totalValue: number;
+    bonusValue: number;
+    reply: string;
+}
+
+export function calculateFeastRoll(args: string[], userName: string): FeastRollResult {
+    // 1. Parse args into a dice pool (array of numbers)
+    let dicePool: number[] = [];
+    const diceStrings: string[] = []; // For the reply string
+
+    const regex = /(\d*)d(\d+)/i;
+    for (const arg of args) {
+        const match = arg.match(regex);
+        if (match) {
+            const numDice = match[1] ? parseInt(match[1], 10) : 1;
+            const diceSize = parseInt(match[2], 10);
+            for (let i = 0; i < numDice; i++) {
+                dicePool.push(diceSize);
+            }
+            diceStrings.push(arg);
+        }
+    }
+
+    if (dicePool.length === 0) {
+        return { totalValue: 0, bonusValue: 0, reply: "无效的骰池，请输入如 .dd feast 4d8 2d6" };
+    }
+
+    let totalValue = 0;
+    let bonusValue = 0;
+    const steps: string[] = [];
+
+    let round = 1;
+    while (dicePool.length >= 2) {
+        // 2. Roll all dice
+        const rollResults = dicePool.map(side => ({ side, value: randomNum(side) }));
+        steps.push(`第 ${round} 轮, 骰池: [d${dicePool.join(', d')}]`);
+        steps.push(`> 掷骰结果: [${rollResults.map(r => r.value).join(', ')}]`);
+
+        // 3. Group results by value
+        const valueGroups = new Map<number, { side: number, value: number }[]>();
+        for (const roll of rollResults) {
+            if (!valueGroups.has(roll.value)) {
+                valueGroups.set(roll.value, []);
+            }
+            valueGroups.get(roll.value)!.push(roll);
+        }
+
+        // 4. Find matches
+        const matchedDiceThisRound: { value: number, count: number }[] = [];
+        const remainingRolls = [...rollResults];
+        let matchFound = false;
+
+        for (const [value, group] of valueGroups.entries()) {
+            if (group.length > 1) {
+                matchFound = true;
+                totalValue += value;
+                bonusValue += group.length - 2;
+                matchedDiceThisRound.push({ value, count: group.length });
+
+                // Remove matched dice from remainingRolls
+                for (const matchedDie of group) {
+                    const index = remainingRolls.findIndex(r => r === matchedDie);
+                    if (index > -1) {
+                        remainingRolls.splice(index, 1);
+                    }
+                }
+            }
+        }
+        
+        if (matchFound) {
+            const totalValueGained = matchedDiceThisRound.map(m => m.value).reduce((a, b) => a + b, 0);
+            const bonusValueGained = matchedDiceThisRound.map(m => m.count - 2).reduce((a, b) => a + b, 0);
+            steps.push(`  -> 发现匹配: ${matchedDiceThisRound.map(m => `${m.count}个${m.value}`).join(', ')}`);
+            steps.push(`     总值 +${totalValueGained}, 奖励值 +${bonusValueGained}`);
+            dicePool = remainingRolls.map(r => r.side);
+        } else {
+            // 5. No matches, remove one die randomly
+            const removedIndex = randomNum(remainingRolls.length) - 1;
+            const removedDie = remainingRolls[removedIndex];
+            steps.push(`  -> 未发现匹配, 随机移除一个 d${removedDie.side} (出目 ${removedDie.value})`);
+            remainingRolls.splice(removedIndex, 1);
+            dicePool = remainingRolls.map(r => r.side);
+        }
+        
+        round++;
+    }
+    
+    if (dicePool.length > 0) {
+        steps.push(`结束, 剩余骰池: [d${dicePool.join(', d')}]`);
+    } else {
+        steps.push(`结束, 骰池已空`);
+    }
+
+    // 6. Format reply
+    let reply = `【${userName}】的饕餮盛宴:\n`;
+    reply += `初始骰池: ${diceStrings.join(' ')}\n`;
+    reply += "========================\n";
+    reply += steps.join('\n');
+    reply += "\n========================";
+    reply += `\n最终结果 -> 总值: ${totalValue}, 奖励值: ${bonusValue}`;
+
+    return { totalValue, bonusValue, reply };
+}
