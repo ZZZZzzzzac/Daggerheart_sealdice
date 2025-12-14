@@ -21,51 +21,19 @@ const CONFIG = {
   messages: {
     // 二元骰结果文案（系统会随机选择一条）
     // 大成功文案
-    criticalSuccess: [
-      '关键成功！希望之光闪耀，内心的重负得以释放！',
-      '奇迹时刻！命运的眷顾让你重燃希望，卸下心头重担！'
-    ],
+    criticalSuccess: [],
     // 希望结果文案
-    hopeWins: [
-      '希望战胜了恐惧！光明指引着前路。',
-      '勇气驱散了阴霾，希望之光照亮道路！',
-      '内心的光芒战胜了黑暗，前进的道路清晰可见！'
-    ],
+    hopeWins: [],
     //恐惧结果文案
-    fearWins: [
-      '恐惧笼罩了希望...阴霾降临。',
-      '黑暗的阴影遮蔽了光明，困难重重...',
-      '努力的尝试只带了恐惧...前路变得模糊不清...'
-    ],
+    fearWins: [],
     //希望结果时的希望变化文案(系统会随机选择一条）
-    hopeNetIncrease: [
-      '你的内心涌现出更多的希望与勇气！',
-      '这使你充满了决心！',
-    ],
-    hopeNetDecrease: [
-      '为了争取希望，你付出了更多...',
-      '希望的光芒有所消退了...',
-    ],
-    hopeNetUnchanged: [
-      '希望的获取与消耗达到了微妙的平衡。',
-      '在得失之间，心境保持着稳定。',
-      '希望与代价相抵，恰如平常。'
-    ],
+    hopeNetIncrease: [],
+    hopeNetDecrease: [],
+    hopeNetUnchanged: [],
     // 恐惧结果时的希望变化文案(系统会随机选择一条）
-    hopeNetIncreaseForFear: [
-      '即便在恐惧中，希望的种子仍在生长...',
-      '再深的恐惧也无法熄灭希望的光芒。'
-    ],
-    hopeNetDecreaseForFear: [
-      '恐惧的阴霾让内心的光芒更加黯淡...',
-      '在黑暗面前，勇气暂时退缩了。',
-      '恐惧吞噬了你的希望。'
-    ],
-    hopeNetUnchangedForFear: [
-      '恐惧与希望在拉锯中保持着平衡。',
-      '即使面对恐惧，内心依然坚守着底线。',
-      '恐惧与希望在心中相互抗衡。'
-    ],
+    hopeNetIncreaseForFear: [],
+    hopeNetDecreaseForFear: [],
+    hopeNetUnchangedForFear: [],
     // 检定标题文案
     rollTitle: '{userName}进行二元骰检定',
     rollTitleWithReason: '{userName}为「{reason}」进行二元骰检定',
@@ -1453,14 +1421,14 @@ class DualityDiceLogic {
     const resultType = hopeRoll === fearRoll ? 'critical' :
       hopeRoll > fearRoll ? 'hope' : 'fear';
 
-    let message;
-    if (resultType === 'critical') {
-      message = getRandomMessage(CONFIG.messages.criticalSuccess);
-    } else if (resultType === 'hope') {
-      message = getRandomMessage(CONFIG.messages.hopeWins);
-    } else {
-      message = getRandomMessage(CONFIG.messages.fearWins);
-    }
+    let message = '';
+    // if (resultType === 'critical') {
+    //   message = getRandomMessage(CONFIG.messages.criticalSuccess);
+    // } else if (resultType === 'hope') {
+    //   message = getRandomMessage(CONFIG.messages.hopeWins);
+    // } else {
+    //   message = getRandomMessage(CONFIG.messages.fearWins);
+    // }
 
     // 处理属性更新
     let hopeUpdate = {
@@ -1903,38 +1871,38 @@ class ResponseFormatter {
     response += `\n${rollResult.outcomeText}`;
 
     // 添加希望自定义文案（在分隔线下方的自定义文案区）
-    if (rollResult.hopeUpdate && rollResult.hopeUpdate.tracker) {
-      const netChange = rollResult.hopeUpdate.tracker.getNetChange();
-      let hopeCustomText = '';
+    // if (rollResult.hopeUpdate && rollResult.hopeUpdate.tracker) {
+    //   const netChange = rollResult.hopeUpdate.tracker.getNetChange();
+    //   let hopeCustomText = '';
 
-      // 根据结果类型选择不同的希望变化文案
-      if (rollResult.resultType === 'fear') {
-        // 恐惧结果时使用专门的文案
-        if (netChange > 0) {
-          hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetIncreaseForFear);
-        } else if (netChange < 0) {
-          hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetDecreaseForFear);
-        } else {
-          hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetUnchangedForFear);
-        }
-      } else if (rollResult.resultType === 'critical') {
-        // 关键成功时不显示额外的自定义文案，因为已经在详情中包含了
-        hopeCustomText = null;
-      } else {
-        // 希望结果时使用原有文案
-        if (netChange > 0) {
-          hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetIncrease);
-        } else if (netChange < 0) {
-          hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetDecrease);
-        } else {
-          hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetUnchanged);
-        }
-      }
+    //   // 根据结果类型选择不同的希望变化文案
+    //   if (rollResult.resultType === 'fear') {
+    //     // 恐惧结果时使用专门的文案
+    //     if (netChange > 0) {
+    //       hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetIncreaseForFear);
+    //     } else if (netChange < 0) {
+    //       hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetDecreaseForFear);
+    //     } else {
+    //       hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetUnchangedForFear);
+    //     }
+    //   } else if (rollResult.resultType === 'critical') {
+    //     // 关键成功时不显示额外的自定义文案，因为已经在详情中包含了
+    //     hopeCustomText = null;
+    //   } else {
+    //     // 希望结果时使用原有文案
+    //     if (netChange > 0) {
+    //       hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetIncrease);
+    //     } else if (netChange < 0) {
+    //       hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetDecrease);
+    //     } else {
+    //       hopeCustomText = getRandomMessage(CONFIG.messages.hopeNetUnchanged);
+    //     }
+    //   }
 
-      if (hopeCustomText) {
-        response += `\n${hopeCustomText}`;
-      }
-    }
+    //   if (hopeCustomText) {
+    //     response += `\n${hopeCustomText}`;
+    //   }
+    // }
 
     // 显示属性变化
     const attributeChanges = [];
