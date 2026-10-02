@@ -1,28 +1,19 @@
-import { parseRequest, rollRequest, formatRoll } from './rules.mjs';
+import { parseRequest, rollRequest, formatRoll, formatSettlement } from './rules.mjs';
 import { RESOURCES, canonicalResource, bounded, validateResources, adjustResource, settle, resourceSummary, parseGroupState } from './state.mjs';
 
-const VERSION = '0.2.0';
-const HELP = `.dd [特质] [修正] [advN/disN] [dcN或[N]] [exp:经历ID] [-- 原因]
-例：.dd 敏捷 adv2 dis1 dc15 -- 越过断桥
-例：.dd 力量 exp:e1 dc16 -- 破门
-.ddr 为反应检定，不产生希望/恐惧或清除压力。
-adv/dis来源抵消后至多一枚d6；未知参数会拒绝。
-.dh help 查看资源与GM指令。原生.st管理属性与资源；完整资源和GM就绪时自动结算，否则投骰并给手动提示。
-经历由导入字段读取，不接受旧expN自报数值；援助和代骰不在此版本。`;
-const RESOURCE_HELP = `.dh status —— 当前角色资源
-.st管理属性、上限和当前资源；不需要.dh init或Chat人物卡。
-.dh 希望 -1 / .dh hp +1 / .dh 金币 =20 —— 只修改自己的当前卡
-.dh gm / .dh gm claim / .dh gm set 平台完整用户ID / .dh gm clear
-首次认领须群管理及以上；GM交接须当前GM或群管理；master可管理恐惧。
-.dh fear / .dh fear +1 / .dh fear =0 —— 共享恐惧池，上限12
-.dh experience —— 查看已导入经历；静态编辑和升级在PbDH完成
-.dh recover —— 原操作人以同一角色恢复未完成写回，不重新投骰
-.dh rule 核心 —— 核心结算速查
-托管行动检定前须指定GM。这里只提供Dice指令；Chat卡片、标签与.pbcha导入尚未接入。`;
+const VERSION = '0.2.1';
+const HELP = `.dd [属性] [修正] [adv/dis] [dc难度] [exp:经历ID] [-- 原因]
+例：.dd 敏捷 +2 adv dc15 -- 攀爬
+.ddr：反应掷骰；.st：属性与资源；.dh help：资源指令。`;
+const RESOURCE_HELP = `.dh status：查看资源；.dh 希望 -1：增减资源（生命/压力/护甲/希望/金币）
+.dh fear [+N/-N/=N]：恐惧池；.st：属性与资源
+.dh gm claim：认领GM；.dh gm set 用户ID：交接；.dh gm clear：解除
+.dh experience：查看经历；.dh rule 核心：规则速查
+.dh recover：恢复上次操作`;
 const ext = seal.ext.new('daggerheart-native', 'Daggerheart workspace', VERSION);
 const keyFor = ctx => {
-  if (ctx.isPrivate || !ctx.group?.groupId) throw new Error('动态资源与恐惧池操作请在频道/群内使用');
-  if (!ctx.player?.userId) throw new Error('无法确认操作人身份');
+  if (ctx.isPrivate || !ctx.group?.groupId) throw new Error('请在群聊中使用');
+  if (!ctx.player?.userId) throw new Error('无法确认玩家身份');
   return `dh:v1:${ctx.group.groupId}`;
 };
 const DEFAULTS = { 敏捷: 0, 力量: 0, 灵巧: 0, 本能: 0, 风度: 0, 知识: 0, 生命: 0, 压力: 0, 护甲: 0, 希望: 2, 金币: 0, 护甲上限: 0 };
@@ -65,9 +56,9 @@ function mutation(ctx, msg, build) {
   const id = requestKey(ctx, msg);
   if (id) {
     const receipt = state.receipts.find(item => item.id === id);
-    if (receipt) return receipt.reply + '\n（重复消息：沿用原结果，未重复结算）';
+    if (receipt) return receipt.reply + '（重复消息）';
   }
-  if (state.pending) throw new Error('频道存在未完成写回；原操作人使用同一角色执行 .dh recover');
+  if (state.pending) throw new Error('上次操作未完成，请原玩家执行 .dh recover');
   const plan = build(state);
   const patch = plan.writes || [];
   // A durable intent bridges the separately persisted attribute and extension stores.
@@ -83,31 +74,31 @@ function mutation(ctx, msg, build) {
     for (const item of patch) write(ctx, item.key, item.after, item.type);
     const receipts = id ? [...state.receipts, { id, reply: plan.reply }].slice(-100) : state.receipts;
     save(ctx, { ...state, gm: pending.gm, fear: pending.fear, revision: state.revision + 1, receipts, pending: null });
-  } catch { throw new Error('写回未完成，已保存原结果；请勿重投，执行 .dh recover 检查并恢复'); }
+  } catch { throw new Error('保存失败，请执行 .dh recover，勿重投'); }
   return plan.reply;
 }
 function recover(ctx) {
   const state = load(ctx), pending = state.pending;
   if (!pending) return '没有待恢复操作。';
-  if (pending.owner !== ctx.player.userId) throw new Error('须由原操作人恢复，其他玩家不能代写人物卡');
+  if (pending.owner !== ctx.player.userId) throw new Error('请由原玩家恢复');
   const currentRole = read(ctx, 'DH角色标识', 'str');
   const newRole = pending.writes.find(item => item.key === 'DH角色标识')?.after;
-  if (currentRole !== pending.role && currentRole !== newRole) throw new Error('当前角色已改变；请切回原卡再恢复');
+  if (currentRole !== pending.role && currentRole !== newRole) throw new Error('请切回原角色后恢复');
   for (const item of pending.writes) {
     const current = read(ctx, item.key, item.type);
-    if (current !== item.before && current !== item.after) throw new Error(`“${item.key}”已被其他操作修改，不能安全恢复；请维护者核对备份，不会覆盖当前值`);
+    if (current !== item.before && current !== item.after) throw new Error(`${item.key}已变动，请联系骰主恢复`);
   }
   for (const item of pending.writes) write(ctx, item.key, item.after, item.type);
   const receipts = pending.id ? [...state.receipts, { id: pending.id, reply: pending.reply }].slice(-100) : state.receipts;
   save(ctx, { ...state, gm: pending.gm, fear: pending.fear, revision: state.revision + 1, receipts, pending: null });
-  return pending.reply + '\n（已完成原操作写回，未重新投骰）';
+  return pending.reply + '（已恢复）';
 }
 function experiences(ctx) {
   const raw = read(ctx, 'DH经历', 'str');
-  if (!raw) throw new Error('尚无已导入经历；PbDH导入接口尚未发布，不能自报expN替代');
+  if (!raw) throw new Error('尚无经历');
   let entries;
-  try { entries = JSON.parse(raw); } catch { throw new Error('经历字段不是有效JSON'); }
-  if (!Array.isArray(entries) || entries.length > 50) throw new Error('经历结构无效');
+  try { entries = JSON.parse(raw); } catch { throw new Error('经历数据有误'); }
+  if (!Array.isArray(entries) || entries.length > 50) throw new Error('经历数据有误');
   const ids = new Set();
   for (const entry of entries) {
     if (!entry || !/^[a-zA-Z0-9_-]{1,40}$/.test(entry.id) || ids.has(entry.id) || typeof entry.name !== 'string' || !entry.name.trim() || entry.name.length > 100) throw new Error('经历标识或名称无效');
@@ -119,7 +110,7 @@ function experiences(ctx) {
 }
 function prepareRoll(ctx, args, reaction) {
   const request = parseRequest(args, reaction);
-  if (request.terms.some(item => item.kind === 'experience' && !item.id)) throw new Error('不接受自报expN；请使用已导入经历的 exp:ID');
+  if (request.terms.some(item => item.kind === 'experience' && !item.id)) throw new Error('经历格式：exp:ID（.dh experience 查看）');
   if (request.experienceIds.length) {
     const entries = experiences(ctx);
     for (const id of request.experienceIds) {
@@ -131,7 +122,7 @@ function prepareRoll(ctx, args, reaction) {
   let traitValue = 0;
   if (request.trait) {
     traitValue = read(ctx, request.trait);
-    if (traitValue === null) throw new Error(`当前人物卡没有整数特质“${request.trait}”`);
+    if (traitValue === null) throw new Error(`请用.st设置属性“${request.trait}”`);
   }
   return { request, traitValue };
 }
@@ -143,18 +134,19 @@ function doRoll(ctx, msg, args, reaction) {
   const state = resources && inGroup ? load(ctx) : null;
   const automatic = resources && inGroup && (reaction || state.gm);
   if (!automatic) {
-    if (request.experienceCosts) throw new Error('已导入经历扣费需要完整资源和频道状态；未投骰。普通修正可直接写+N');
+    if (request.experienceCosts) throw new Error('请先用.st设置资源，并在群聊中使用经历');
     const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, traitValue);
-    return formatRoll(result, ctx.player.name, true) + '\n未自动修改资源：' + (!resources ? '资源/上限未完整设置，请用.st手动结算。' : !inGroup ? '私聊仅投骰。' : '尚未指定GM，避免部分结算；请手动结算或.dh gm指定GM。');
+    return formatRoll(result, ctx.player.name, true);
   }
   return mutation(ctx, msg, state => {
     const { values, caps } = readResources(ctx);
-    if (!reaction && !state.gm) throw new Error('请先指定GM（.dh gm claim / set），才能托管行动检定；未投骰');
-    if (values.希望 < request.experienceCosts) throw new Error('希望不足；未投骰、未扣费');
+    if (!reaction && !state.gm) throw new Error('请先指定GM：.dh gm claim / set');
+    if (values.希望 < request.experienceCosts) throw new Error('希望不足');
     const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, traitValue);
     const next = settle(values, caps, result.effects, state.fear);
+    const summary = formatSettlement(values, next.values, state.fear, next.fear, result.effects);
     return { writes: changes(ctx, { 希望: next.values.希望, 压力: next.values.压力 }), fear: next.fear,
-      reply: formatRoll(result, ctx.player.name, false) + '\n已结算：' + resourceSummary(next.values, caps) + ` ｜ GM恐惧 ${next.fear}/12` };
+      reply: formatRoll(result, ctx.player.name, false) + (summary ? '\n' + summary : '') };
   });
 }
 function canManageGM(ctx, state) { return ctx.player.userId === state.gm || ctx.privilegeLevel >= 50; }
@@ -163,8 +155,8 @@ function resourceCommand(ctx, msg, args) {
   const sub = (args[0] || 'status').toLowerCase();
   if (sub === 'help' || sub === '帮助') return RESOURCE_HELP;
   if (sub === 'rule' || sub === '规则') {
-    if (args.length > 2 || (args[1] && !['核心', 'core'].includes(args[1]))) throw new Error('本版只提供 .dh rule 核心；完整术语库仍待开发');
-    return '正式版核心速查：二元骰为希望d12+恐惧d12。相同出目关键成功；否则与难度比较，希望骰较高则获得希望，恐惧骰较高则GM获得恐惧。普通优劣势来源抵消后至多一枚d6。行动关键成功获得1希望并清除1压力；反应不产生希望/恐惧，也不清压力。每项经历先消耗1希望。希望上限6，GM恐惧上限12。\n依据：官方SRD 2.0核心第47–49页 https://www.daggerheart.com/srd/';
+    if (args.length > 2 || (args[1] && !['核心', 'core'].includes(args[1]))) throw new Error('用法：.dh rule 核心');
+    return '正式版核心速查：二元骰为希望d12+恐惧d12。相同出目关键成功；否则与难度比较，希望骰较高则获得希望，恐惧骰较高则GM获得恐惧。普通优劣势来源抵消后至多一枚d6。关键成功获得1希望并清除1压力；反应不产生希望/恐惧，也不清压力。每项经历先消耗1希望。希望上限6，GM恐惧上限12。\n依据：官方SRD 2.0核心第47–49页 https://www.daggerheart.com/srd/';
   }
   if (sub === 'recover') {
     if (args.length !== 1) throw new Error('格式：.dh recover');
@@ -177,8 +169,8 @@ function resourceCommand(ctx, msg, args) {
     return mutation(ctx, msg, current => {
       let gm;
       if (args[1] === 'claim' && args.length === 2) {
-        if (current.gm && current.gm !== ctx.player.userId) throw new Error('已有GM；请由当前GM或管理员交接');
-        if (!current.gm && ctx.privilegeLevel < 50) throw new Error('首次指定GM需要群管理及以上权限');
+        if (current.gm && current.gm !== ctx.player.userId) throw new Error('已有GM，请由GM或管理员交接');
+        if (!current.gm && ctx.privilegeLevel < 50) throw new Error('认领GM需要群管理权限');
         gm = ctx.player.userId;
       } else if (args[1] === 'set' && args.length === 3) {
         if (!canManageGM(ctx, current)) throw new Error('只有GM或群管理员可以指定GM');
@@ -188,7 +180,7 @@ function resourceCommand(ctx, msg, args) {
         if (!canManageGM(ctx, current)) throw new Error('只有GM或群管理员可以解除GM');
         gm = '';
       } else throw new Error('格式：.dh gm claim / set 用户ID / clear');
-      return { gm, reply: `GM已${gm ? '设为 ' + gm : '解除'}；恐惧池保留 ${current.fear}/12` };
+      return { gm, reply: `GM${gm ? '：' + gm : '已解除'} ｜ 恐惧${current.fear}/12` };
     });
   }
   if (sub === 'fear' || sub === '恐惧') {
@@ -202,20 +194,20 @@ function resourceCommand(ctx, msg, args) {
     });
   }
   if (sub === 'experience' || sub === '经历') {
-    if (args.length !== 1) throw new Error('格式：.dh experience（只读）');
+    if (args.length !== 1) throw new Error('用法：.dh experience');
     return experiences(ctx).map(item => `${item.id}：${item.name} +${item.value}`).join('\n') || '尚无经历';
   }
   if (sub === 'status' || sub === '状态') {
     if (args.length !== 1) throw new Error('格式：.dh status');
     const state = load(ctx), { values, caps } = readResources(ctx);
-    return resourceSummary(values, caps) + ` ｜ GM恐惧 ${state.fear}/12` + (state.pending ? '\n存在未完成写回，请原操作人执行 .dh recover' : '');
+    return resourceSummary(values, caps) + ` ｜ GM恐惧 ${state.fear}/12` + (state.pending ? ' ｜ 待恢复：.dh recover' : '');
   }
   const resource = canonicalResource(sub);
-  if (!resource || args.length !== 2) throw new Error('未知资源或格式错误；使用 .dh help');
+  if (!resource || args.length !== 2) throw new Error('用法：.dh 资源 +N/-N/=N');
   return mutation(ctx, msg, state => {
     const { values, caps } = readResources(ctx);
     const next = adjustResource(values, caps, resource, args[1]);
-    return { writes: changes(ctx, { [resource]: next[resource] }), reply: `${resource} ${values[resource]} → ${next[resource]}\n` + resourceSummary(next, caps) + ` ｜ GM恐惧 ${state.fear}/12` };
+    return { writes: changes(ctx, { [resource]: next[resource] }), reply: `${resource}${values[resource]}→${next[resource]}` };
   });
 }
 function register(name, help, execute) {
@@ -228,11 +220,11 @@ function register(name, help, execute) {
     }
     try {
       if (args.length > 80 || args.join(' ').length > 1000) throw new Error('指令过长');
-      if (cmdArgs.kwargs?.length) throw new Error('不支持 --选项；原因请用独立的 -- 分隔');
-      if (Array.from(cmdArgs.at || []).some(at => at.userId !== ctx.endPoint?.userId)) throw new Error('此版本未接入援助或代骰；不会修改其他玩家资源');
+      if (cmdArgs.kwargs?.length) throw new Error('原因前加独立的 --');
+      if (Array.from(cmdArgs.at || []).some(at => at.userId !== ctx.endPoint?.userId)) throw new Error('请用自己的角色掷骰');
       if (ctx.privilegeLevel < 0) throw new Error('无权执行此操作');
       seal.replyToSender(ctx, msg, execute(ctx, msg, args));
-    } catch (error) { seal.replyToSender(ctx, msg, `匕首之心：${error.message}\n使用 .${name} help 查看格式。`); }
+    } catch (error) { seal.replyToSender(ctx, msg, error.message); }
     return seal.ext.newCmdExecuteResult(true);
   };
   ext.cmdMap[name] = cmd;

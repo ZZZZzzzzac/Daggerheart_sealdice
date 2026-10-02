@@ -1,7 +1,7 @@
 name: daggerheart-native
 fullName: 匕首之心正式版核心
 authors: [Daggerheart workspace]
-version: 0.2.0
+version: 0.2.1
 templateVer: "2.0"
 updatedTime: "2026-10-02"
 attrs:
@@ -38,7 +38,7 @@ alias:
 commands:
   set:
     diceSides: "20"
-    enableTip: "已启用匕首之心：玩家使用 .dd，反应检定使用 .ddr。"
+    enableTip: ".dd：掷骰；.ddr：反应掷骰。"
     keys: [dh, daggerheart-native, 匕首之心]
     relatedExt: [daggerheart-native]
   sn: {}

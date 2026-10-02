@@ -23,7 +23,8 @@ test('difficulty boundary and no-difficulty result do not invent success/failure
   assert.equal(equal.success, true);
   const missing = rollRequest(parseRequest([]), sequence(7, 6));
   assert.equal(missing.success, null);
-  assert.match(formatRoll(missing, '甲'), /未指定难度/);
+  assert.match(formatRoll(missing, '甲'), /掷骰 · 希望/);
+  assert.doesNotMatch(formatRoll(missing, '甲'), /成功|失败|难度/);
 });
 test('ordinary advantages cancel by source then roll only one die', () => {
   const result = rollRequest(parseRequest(['adv3', 'dis1']), sequence(5, 6, 4));

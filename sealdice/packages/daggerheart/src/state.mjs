@@ -1,9 +1,9 @@
 export const RESOURCES = {
-  生命: { max: '生命上限', label: '已标记生命' },
-  压力: { max: '压力上限', label: '已标记压力' },
-  护甲: { max: '护甲上限', label: '已标记护甲' },
-  希望: { limit: 6, label: '可用希望' },
-  金币: { limit: 999999, label: '金币计数' },
+  生命: { max: '生命上限', label: '生命' },
+  压力: { max: '压力上限', label: '压力' },
+  护甲: { max: '护甲上限', label: '护甲' },
+  希望: { limit: 6, label: '希望' },
+  金币: { limit: 999999, label: '金币' },
 };
 export const RESOURCE_ALIASES = { hp: '生命', stress: '压力', armor: '护甲', hope: '希望', gold: '金币' };
 export function canonicalResource(value) { return RESOURCES[value] ? value : RESOURCE_ALIASES[value.toLowerCase()]; }
@@ -36,7 +36,7 @@ export function settle(values, caps, effects, fear) {
   return { values: next, fear: Math.min(12, fear + effects.fearGain) };
 }
 export function resourceSummary(values, caps) {
-  return Object.entries(RESOURCES).map(([key, spec]) => `${spec.label} ${values[key]}${spec.max ? '/' + caps[spec.max] : key === '希望' ? '/6' : ''}`).join(' ｜ ');
+  return Object.entries(RESOURCES).map(([key, spec]) => `${spec.label}${values[key]}${spec.max ? '/' + caps[spec.max] : key === '希望' ? '/6' : ''}`).join(' ｜ ');
 }
 export function parseGroupState(raw) {
   if (!raw) return { schema: 1, gm: '', fear: 0, revision: 0, receipts: [], pending: null };

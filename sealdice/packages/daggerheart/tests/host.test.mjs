@@ -34,14 +34,14 @@ test('plain dd and st-style attributes work without Chat, init or resource state
   assert.equal(h.run('dd', ['help']).showHelp, true);
   h.run('dd', ['敏捷', 'junk']); assert.equal(h.rolls, 0);
   h.run('dd', ['敏捷', 'dc15']); assert.equal(h.rolls, 2);
-  assert.match(h.replies.at(-1), /敏捷=\+3/); assert.match(h.replies.at(-1), /请用.st手动结算/);
+  assert.match(h.replies.at(-1), /\+敏捷3/); assert.match(h.replies.at(-1), /手动：/);
   assert.equal(h.attrs.get('希望'), undefined); assert.equal(h.shared.size, 0);
-  h.attrs.set('敏捷', 4); h.run('ddr', ['敏捷']); assert.match(h.replies.at(-1), /敏捷=\+4/);
+  h.attrs.set('敏捷', 4); h.run('ddr', ['敏捷']); assert.match(h.replies.at(-1), /\+敏捷4/);
 });
 test('invalid options and other mentions fail before rolling; bot mention works', () => {
   const h = host();
   h.run('dd', [], { at: [{ userId: 'SEALCHAT:OTHER' }] }); assert.equal(h.rolls, 0);
-  assert.match(h.replies.at(-1), /未接入援助/);
+  assert.match(h.replies.at(-1), /自己的角色/);
   h.run('dd', [], { kwargs: [{ name: 'evil' }] }); assert.equal(h.rolls, 0);
   h.run('dd', [], { at: [{ userId: 'SEALCHAT:BOT' }] }); assert.equal(h.rolls, 2);
 });
@@ -49,14 +49,14 @@ test('complete st resources auto-settle critical and reaction needs no init', ()
   const h = host(complete);
   h.run('dh', ['gm', 'claim']); h.run('dd', ['敏捷']);
   assert.equal(h.attrs.get('希望'), 3); assert.equal(h.attrs.get('压力'), 1);
-  assert.match(h.replies.at(-1), /已结算/);
+  assert.match(h.replies.at(-1), /希望2→3/);
   h.run('ddr', ['敏捷']); assert.equal(h.attrs.get('希望'), 3); assert.equal(h.attrs.get('压力'), 1);
   h.attrs.set('希望', 6); h.run('dd', []); assert.equal(h.attrs.get('希望'), 6); assert.equal(h.attrs.get('压力'), 0);
 });
 test('no GM still allows ordinary roll, without partial settlement', () => {
   const h = host(complete); h.run('dd', []);
   assert.equal(h.rolls, 2); assert.equal(h.attrs.get('希望'), 2); assert.equal(h.attrs.get('压力'), 2);
-  assert.match(h.replies.at(-1), /尚未指定GM/);
+  assert.match(h.replies.at(-1), /手动：/);
 });
 test('resources use current st values; overflow and invalid card fail without mutation', () => {
   const h = host(complete); h.run('dh', ['hope', '+1']); assert.equal(h.attrs.get('希望'), 3);
@@ -75,7 +75,7 @@ test('GM permissions, handover, cap, channel isolation and persistence', () => {
   h.context({ user: 'SEALCHAT:OTHER' }); h.run('dh', ['fear', '-1']);
   h.reload(); h.run('dh', ['fear']); assert.match(h.replies.at(-1), /11\/12/);
   h.context({ group: 'SEALCHAT:SECOND' }); h.run('dh', ['fear']); assert.match(h.replies.at(-1), /0\/12/);
-  h.run('dh', ['fear'], { private: true }); assert.match(h.replies.at(-1), /频道\/群/);
+  h.run('dh', ['fear'], { private: true }); assert.match(h.replies.at(-1), /群聊/);
 });
 test('same message ID does not roll or settle twice, including after extension reload', () => {
   const h = host(complete); h.run('dh', ['gm', 'claim']);
@@ -86,11 +86,11 @@ test('same message ID does not roll or settle twice, including after extension r
 });
 test('interrupted write freezes group; same owner/card recovery finishes original roll once', () => {
   const h = host(complete); h.run('dh', ['gm', 'claim']); h.fail('压力'); h.run('dd', [], { id: 'interrupted' });
-  assert.match(h.replies.at(-1), /写回未完成/); const count = h.rolls;
-  h.run('dh', ['hope', '-1']); assert.match(h.replies.at(-1), /未完成写回/);
-  h.context({ user: 'SEALCHAT:OTHER' }); h.run('dh', ['recover']); assert.match(h.replies.at(-1), /原操作人/);
+  assert.match(h.replies.at(-1), /保存失败/); const count = h.rolls;
+  h.run('dh', ['hope', '-1']); assert.match(h.replies.at(-1), /上次操作未完成/);
+  h.context({ user: 'SEALCHAT:OTHER' }); h.run('dh', ['recover']); assert.match(h.replies.at(-1), /原玩家/);
   h.context({ user: 'SEALCHAT:PLAYER' }); const role = h.attrs.get('DH角色标识'); h.attrs.set('DH角色标识', 'other-role');
-  h.run('dh', ['recover']); assert.match(h.replies.at(-1), /角色已改变/);
+  h.run('dh', ['recover']); assert.match(h.replies.at(-1), /切回原角色/);
   h.attrs.set('DH角色标识', role); h.reload(); h.run('dh', ['recover']);
   assert.equal(h.rolls, count); assert.equal(h.attrs.get('希望'), 3); assert.equal(h.attrs.get('压力'), 1);
   h.run('dd', [], { id: 'interrupted' }); assert.equal(h.rolls, count);
@@ -98,15 +98,15 @@ test('interrupted write freezes group; same owner/card recovery finishes origina
 test('recovery refuses intervening external writes rather than overwriting st', () => {
   const h = host(complete); h.run('dh', ['gm', 'claim']); h.fail('压力'); h.run('dd', []);
   h.attrs.set('希望', 0); h.run('dh', ['recover']);
-  assert.match(h.replies.at(-1), /已被其他操作修改/); assert.equal(h.attrs.get('希望'), 0);
+  assert.match(h.replies.at(-1), /已变动/); assert.equal(h.attrs.get('希望'), 0);
 });
 test('experiences come from imported IDs, cost before gains, and missing funds do not roll', () => {
   const h = host({ ...complete, DH经历: JSON.stringify([{ id: 'e1', name: '山地向导', value: 2 }]) });
   h.run('dh', ['gm', 'claim']); h.run('dd', ['敏捷', 'exp:e1']);
-  assert.equal(h.attrs.get('希望'), 2); assert.match(h.replies.at(-1), /山地向导=\+2/);
+  assert.equal(h.attrs.get('希望'), 2); assert.match(h.replies.at(-1), /\+山地向导2/);
   h.attrs.set('希望', 0); const count = h.rolls; h.run('dd', ['exp:e1']); assert.equal(h.rolls, count);
   h.run('dd', ['exp:no']); assert.equal(h.rolls, count);
-  h.run('dd', ['exp2']); assert.equal(h.rolls, count); assert.match(h.replies.at(-1), /不接受自报/);
+  h.run('dd', ['exp2']); assert.equal(h.rolls, count); assert.match(h.replies.at(-1), /经历格式/);
   h.attrs.set('希望', 2); h.run('ddr', ['exp:e1']); assert.equal(h.attrs.get('希望'), 1);
   h.run('dd', ['exp:e1', 'exp:e1']); assert.match(h.replies.at(-1), /重复选择/);
 });
@@ -115,7 +115,7 @@ test('invalid persisted state fails closed for mutations but plain dd remains us
   assert.match(h.replies.at(-1), /状态损坏/); h.run('dd', []); assert.equal(h.rolls, 2);
 });
 test('archive has only native allowlist and declares no elevated capabilities', () => {
-  const zip = unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.2.0.sealpack', import.meta.url)));
+  const zip = unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.2.1.sealpack', import.meta.url)));
   assert.deepEqual(Object.keys(zip).sort(), ['README.md', 'info.toml', 'scripts/daggerheart.js', 'templates/daggerheart.yaml']);
   assert.match(strFromU8(zip['info.toml']), /min_version = "1.6.1"/);
   assert.match(strFromU8(zip['info.toml']), /network = false/);
@@ -125,6 +125,6 @@ test('archive has only native allowlist and declares no elevated capabilities', 
 
 test('native st omitted defaults are read only from this explicit game template', () => {
   const h = host({ 敏捷: 3, 生命上限: 6, 压力上限: 6 });
-  h.run('dh', ['status']); assert.match(h.replies.at(-1), /已标记生命 0\/6/); assert.match(h.replies.at(-1), /可用希望 2\/6/);
+  h.run('dh', ['status']); assert.match(h.replies.at(-1), /生命0\/6/); assert.match(h.replies.at(-1), /希望2\/6/);
   h.attrs.set('希望', 'bad'); h.run('dh', ['status']); assert.match(h.replies.at(-1), /希望必须/);
 });
