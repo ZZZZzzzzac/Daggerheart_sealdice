@@ -35,17 +35,17 @@ test('ordinary advantages cancel by source then roll only one die', () => {
   const negative = rollRequest(parseRequest(['dis3', 'adv1']), sequence(5, 6, 6));
   assert.equal(negative.advantage, -6);
 });
-test('reaction crit gives no resources; experiences still cost Hope', () => {
-  const result = rollRequest(parseRequest(['exp2', 'exp3'], true), sequence(2, 2));
+test('reaction crit gives no resource effects with ordinary modifiers', () => {
+  const result = rollRequest(parseRequest(['+2', '+3'], true), sequence(2, 2));
   assert.equal(result.success, true);
-  assert.deepEqual(result.effects, { hopeGain: 0, fearGain: 0, stressClear: 0, hopeCost: 2 });
+  assert.deepEqual(result.effects, { hopeGain: 0, fearGain: 0, stressClear: 0 });
 });
-test('trait aliases, signed dice, repeated experience and explicit reason', () => {
-  const request = parseRequest(['agi', '+2-1d4', 'exp2', '[15]', '--', '穿过', '火海']);
+test('trait aliases, signed dice and explicit reason', () => {
+  const request = parseRequest(['agi', '+2-1d4', '[15]', '--', '穿过', '火海']);
   const result = rollRequest(request, sequence(8, 3, 4), 3);
   assert.equal(request.trait, '敏捷');
   assert.equal(request.reason, '穿过 火海');
-  assert.equal(result.total, 14);
+  assert.equal(result.total, 12);
   assert.equal(result.success, false);
   assert.equal(result.effects.hopeGain, 1);
 });

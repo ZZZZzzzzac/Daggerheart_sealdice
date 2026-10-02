@@ -1,19 +1,19 @@
 import { parseRequest, rollRequest, formatRoll, formatSettlement } from './rules.mjs';
 import { bounded, settleOptional, parseGroupState } from './state.mjs';
 
-const VERSION = '0.3.0';
-const HELP = `.dd [属性] [修正] [adv/dis] [dc难度] [exp:经历ID] [-- 原因]
+const VERSION = '0.3.1';
+const HELP = `.dd [属性] [修正] [adv/dis] [dc难度] [-- 原因]
 例：.dd 敏捷 +2 adv dc15 -- 攀爬
 .ddr：反应掷骰；.st：属性与资源；.dh gm：指定GM。`;
 const GM_HELP = `.dh gm claim：自己担任GM
 .dh gm set 用户ID：指定GM；.dh gm clear：卸任
 .st 恐惧+1：调整GM自己的恐惧`;
-const ext = seal.ext.new('daggerheart-native', 'Daggerheart workspace', VERSION);
+const ext = seal.ext.new('daggerheart', 'Daggerheart workspace', VERSION);
 const DEFAULTS = { 敏捷: 0, 力量: 0, 灵巧: 0, 本能: 0, 风度: 0, 知识: 0 };
 const read = (ctx, key, type = 'int') => {
   const [value, exists] = type === 'str' ? seal.vars.strGet(ctx, key) : seal.vars.intGet(ctx, key);
   if (exists) return value;
-  if (type === 'int' && seal.vars.strGet(ctx, '$t游戏模式')[0] === 'daggerheart-native' && Object.prototype.hasOwnProperty.call(DEFAULTS, key)) {
+  if (type === 'int' && seal.vars.strGet(ctx, '$t游戏模式')[0] === 'daggerheart' && Object.prototype.hasOwnProperty.call(DEFAULTS, key)) {
     const [, isString] = seal.vars.strGet(ctx, key);
     const [, isComputed] = seal.vars.computedGet ? seal.vars.computedGet(ctx, key) : [null, false];
     if (!isString && !isComputed && (!seal.format || String(seal.format(ctx, `{${key}}`)).trim() === String(DEFAULTS[key]))) return DEFAULTS[key];
@@ -79,38 +79,13 @@ function recover(ctx) {
   save(ctx, { ...state, gm: pending.gm, revision: state.revision + 1, receipts, pending: null });
   return pending.reply + '（已恢复）';
 }
-function experiences(ctx) {
-  const raw = read(ctx, 'DH经历', 'str');
-  if (!raw) throw new Error('尚无经历');
-  let entries;
-  try { entries = JSON.parse(raw); } catch { throw new Error('经历数据有误'); }
-  if (!Array.isArray(entries) || entries.length > 50) throw new Error('经历数据有误');
-  const ids = new Set();
-  for (const entry of entries) {
-    if (!entry || !/^[a-zA-Z0-9_-]{1,40}$/.test(entry.id) || ids.has(entry.id) || typeof entry.name !== 'string' || !entry.name.trim() || entry.name.length > 100) throw new Error('经历标识或名称无效');
-    bounded(entry.value, 20, '经历值');
-    if (entry.value < 1) throw new Error('经历值至少为1');
-    ids.add(entry.id);
-  }
-  return entries;
-}
 function doRoll(ctx, msg, args, reaction) {
   const request = parseRequest(args, reaction);
-  if (request.terms.some(item => item.kind === 'experience' && !item.id)) throw new Error('经历格式：exp:ID');
-  if (request.experienceIds.length) {
-    const entries = experiences(ctx);
-    for (const id of request.experienceIds) {
-      const entry = entries.find(item => item.id === id);
-      if (!entry) throw new Error(`当前角色没有经历“${id}”`);
-      request.terms.push({ kind: 'experience', id, value: entry.value, name: entry.name });
-    }
-  }
   const traitValue = request.trait ? read(ctx, request.trait) : 0;
   if (traitValue === null) throw new Error(`请用.st设置属性“${request.trait}”`);
   return mutation(ctx, msg, state => {
-    const hope = !reaction || request.experienceCosts ? optional(ctx, '希望', 6) : null;
+    const hope = !reaction ? optional(ctx, '希望', 6) : null;
     const stress = !reaction ? optional(ctx, '压力', Number.MAX_SAFE_INTEGER) : null;
-    if (request.experienceCosts && (hope === null || hope < request.experienceCosts)) throw new Error('希望不足');
     const gm = !reaction && state.gm && !ctx.isPrivate && ctx.group?.groupId ? target(ctx, state.gm) : null;
     const fear = gm ? optional(gm, '恐惧', 12) ?? 0 : null;
     const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, traitValue);
@@ -118,7 +93,7 @@ function doRoll(ctx, msg, args, reaction) {
       stressClear: stress === null ? 0 : result.effects.stressClear, fearGain: gm ? result.effects.fearGain : 0 };
     const before = { 希望: hope, 压力: stress }, next = settleOptional(before, effects, fear);
     const values = {};
-    if (effects.hopeGain || effects.hopeCost) values.希望 = next.values.希望;
+    if (effects.hopeGain) values.希望 = next.values.希望;
     if (effects.stressClear) values.压力 = next.values.压力;
     const writes = changes(ctx, values);
     if (effects.fearGain) writes.push(...changes(gm, { 恐惧: next.fear }));

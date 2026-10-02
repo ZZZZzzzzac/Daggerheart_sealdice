@@ -3,7 +3,7 @@ format_version = "1.0.0"
 [package]
 id = "daggerheart-local/core"
 name = "匕首之心"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["ZZZZzzzzac"]
 license = "Apache-2.0"
 description = "《匕首之心》二元骰插件，从 .dd help 开始使用。"

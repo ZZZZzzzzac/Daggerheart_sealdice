@@ -18,7 +18,7 @@ function host(initial = {}, shared = new Map()) {
     seal: { ext: { new: () => ({ cmdMap: {}, storageGet: k => shared.get(k) || '', storageSet: (k,v) => shared.set(k,v) }),
       register: v => { ext=v; }, newCmdItemInfo: () => ({}), newCmdExecuteResult: solved => ({ solved }) },
       vars: { intGet: (c,k) => [data(c).get(k) ?? 0, Number.isInteger(data(c).get(k))],
-        strGet: (c,k) => k === '$t游戏模式' ? ['daggerheart-native', true] : [data(c).get(k) ?? '', typeof data(c).get(k) === 'string'],
+        strGet: (c,k) => k === '$t游戏模式' ? ['daggerheart', true] : [data(c).get(k) ?? '', typeof data(c).get(k) === 'string'],
         intSet: (c,k,v) => { if (`${c.player.userId}|${k}` === fail) { fail=''; throw Error('write'); } data(c).set(k,v); },
         strSet: (c,k,v) => data(c).set(k,v) },
       newMessage: () => ({ sender: {} }), createTempCtx: (_ep,msg) => context(msg.sender.userId,msg.groupId),
@@ -71,13 +71,11 @@ test('invalid integers or balances fail before rolling or mutation', () => {
   const h=host(); h.run('dh',['gm','set','SEALCHAT:G']); h.attrs('SEALCHAT:G').set('恐惧',13);
   h.run('dd',[]); assert.equal(h.rolls,0); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),13);
 });
-test('experiences require only hope, cost before gain, reactions only cost', () => {
-  const h=host({ 希望:2,DH经历:JSON.stringify([{id:'e1',name:'向导',value:2}]) });
-  h.run('dd',['exp:e1']); assert.equal(h.attrs().get('希望'),2);
-  h.run('ddr',['exp:e1']); assert.equal(h.attrs().get('希望'),1);
-  h.attrs().set('希望',0); const rolls=h.rolls; h.run('dd',['exp:e1']); assert.equal(h.rolls,rolls);
-  h.attrs().delete('希望'); h.run('dd',['exp:e1']); assert.equal(h.rolls,rolls);
-  h.run('dd',['exp2']); assert.match(h.replies.at(-1),/经历格式/);
+test('numeric modifiers never charge hope and old options fail before rolling', () => {
+  const h=host({ 希望:2 }); h.dice(3,8); h.run('dd',['+2']); assert.equal(h.attrs().get('希望'),2);
+  h.dice(8,3); h.run('ddr',['+2']); assert.equal(h.attrs().get('希望'),2);
+  const rolls=h.rolls; for(const arg of ['exp:e1','exp2','经历:e1','经历2']) h.run('dd',[arg]);
+  assert.equal(h.rolls,rolls); assert.equal(h.attrs().get('希望'),2);
 });
 test('repeat message including reload does not reroll or reapply GM fear', () => {
   const h=host(); h.run('dh',['gm','set','SEALCHAT:G']); h.dice(3,8); h.run('dd',[],{id:'one'});
@@ -106,7 +104,7 @@ test('invalid options, other mentions and corrupt state fail before rolling', ()
   h.shared.set('dh:v1:SEALCHAT:ROOM','{bad'); h.run('dd',[]); assert.equal(h.rolls,0);
 });
 test('archive includes only native package files and optional fields have no defaults', () => {
-  const zip=unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.3.0.sealpack',import.meta.url)));
+  const zip=unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.3.1.sealpack',import.meta.url)));
   assert.deepEqual(Object.keys(zip).sort(),['README.md','info.toml','scripts/daggerheart.js','templates/daggerheart.yaml']);
   const yaml=strFromU8(zip['templates/daggerheart.yaml']); assert.match(yaml,/恐惧: \[fear\]/);
   assert.doesNotMatch(yaml,/    (希望|压力|恐惧): [0-9]/); assert.match(yaml,/希望: "null"/); new vm.Script(strFromU8(zip['scripts/daggerheart.js']));

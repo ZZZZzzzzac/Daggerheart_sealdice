@@ -9,11 +9,10 @@ test('all 144 outcomes settle only requested fields and cap hope/fear', () => {
     assert.equal(next.values.希望,h>=f?3:2); assert.equal(next.fear,h<f?4:3); assert.equal(next.values.压力,h===f?1:2);
   }
 });
-test('independent fields, cost validation and saturation', () => {
-  const empty={hopeCost:0,hopeGain:0,stressClear:0,fearGain:0};
+test('independent fields, saturation', () => {
+  const empty={hopeGain:0,stressClear:0,fearGain:0};
   assert.equal(settleOptional({希望:null,压力:null},empty,null).values.希望,null);
   assert.equal(settleOptional({希望:6,压力:0},{...empty,hopeGain:1,stressClear:1,fearGain:1},12).fear,12);
-  assert.throws(()=>settleOptional({希望:0},{...empty,hopeCost:1},null),/希望不足/);
 });
 test('legacy state keeps GM but never copies retired fear pool; unfinished writes block upgrade', () => {
   const old={schema:1,gm:'SEALCHAT:G',fear:8,revision:3,receipts:[],pending:null};

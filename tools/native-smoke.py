@@ -119,11 +119,12 @@ c.solve=(ctx,msg,args)=>{
         command('.dh fear +1','用法：')
         command('.dh 希望 -1','用法：')
         command('.st 希望2')
-        command(".st DH经历='[{\"id\":\"e1\",\"name\":\"测试经历\",\"value\":2}]'")
-        command('.ddr 敏捷 exp:e1 dc15','希望2→1')
-        command('.st 希望0')
-        command('.dd exp:e1','希望不足')
-        command('.dd exp2','经历格式')
+        command('.ddr 敏捷 +2 dc15','掷骰')
+        command('.st show 希望','希望:2')
+        command('.dd exp:e1','无法识别')
+        command('.dd exp2','无法识别')
+        command('.st 希望-1')
+        command('.st show 希望','希望:1')
         command('.st 希望4 金币7')
         command('.dh gm set UI:1003','GM：UI:1003')
         for path in ['/package/disable','/package/reload','/package/enable','/package/reload']: step(path,data={'id':'daggerheart-local/core'})
@@ -142,7 +143,7 @@ c.solve=(ctx,msg,args)=>{
         assert '掷骰' not in command('.dd +2')
         report['passed']=True
         report['persistence_checked']=not args.skip_restart
-        print('PASS native optional fields, real GM card, st, experiences, reload, restart and uninstall.',flush=True)
+        print('PASS native optional fields, real GM card, st, manual modifiers, reload, restart and uninstall.',flush=True)
     finally:
         stop(); log.close()
         (runtime/'native-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')

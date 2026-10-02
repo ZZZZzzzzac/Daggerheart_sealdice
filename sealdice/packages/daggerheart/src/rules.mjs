@@ -19,7 +19,7 @@ export function parseRequest(args, reaction = false) {
   const separator = args.indexOf('--');
   const tokens = separator < 0 ? args : args.slice(0, separator);
   const reason = separator < 0 ? '' : args.slice(separator + 1).join(' ').trim();
-  const request = { reaction, reason, trait: null, terms: [], advantages: 0, disadvantages: 0, difficulty: null, experienceCosts: 0, experienceIds: [] };
+  const request = { reaction, reason, trait: null, terms: [], advantages: 0, disadvantages: 0, difficulty: null };
   let diceCount = 0;
   for (const raw of tokens) {
     const token = raw.toLowerCase();
@@ -37,16 +37,6 @@ export function parseRequest(args, reaction = false) {
     } else if ((match = /^(?:dc(\d+)|\[(\d+)\])$/.exec(token))) {
       if (request.difficulty !== null) throw new Error('难度只能指定一次');
       request.difficulty = integer(match[1] || match[2], 1000, '难度');
-    } else if ((match = /^(?:exp|经历):([a-zA-Z0-9_-]{1,40})$/.exec(raw))) {
-      if (request.experienceIds.includes(match[1])) throw new Error('同一经历不能重复选择');
-      if (request.experienceIds.length >= 10) throw new Error('一次掷骰最多选择10项经历');
-      request.experienceIds.push(match[1]);
-      request.experienceCosts += 1;
-    } else if ((match = /^(?:exp|经历)(\d+)$/.exec(token))) {
-      const value = integer(match[1], 20, '经历修正');
-      if (!value) throw new Error('经历修正至少为1');
-      request.terms.push({ kind: 'experience', value });
-      request.experienceCosts += 1;
     } else {
       const terms = token.match(/[+-]?(?:\d*d\d+|\d+)/g);
       if (!terms || terms.join('') !== token) throw new Error(`无法识别“${raw}”；原因请放在 -- 后`);
@@ -88,7 +78,7 @@ export function rollRequest(request, rollDie, traitValue = 0) {
       detail.push({ label: `${term.sign < 0 ? '-' : '+'}${term.count}d${term.sides}`, value, rolls });
     } else {
       modifier += term.value;
-      detail.push({ label: term.kind === 'experience' ? (term.name || '经历') : '固定修正', value: term.value });
+      detail.push({ label: '固定修正', value: term.value });
     }
   }
   const net = request.advantages - request.disadvantages;
@@ -102,7 +92,6 @@ export function rollRequest(request, rollDie, traitValue = 0) {
     hopeGain: !request.reaction && withHope ? 1 : 0,
     fearGain: !request.reaction && !withHope ? 1 : 0,
     stressClear: !request.reaction && critical ? 1 : 0,
-    hopeCost: request.experienceCosts,
   };
   return { request, hope, fear, detail, modifier, advantage, total, critical, withHope, success, effects };
 }
@@ -123,7 +112,6 @@ export function formatRoll(result, name, hints = true) {
     `${expression}=${total}${request.difficulty !== null ? ` / 难度${request.difficulty}` : ''}`];
   if (hints) {
     const resources = [];
-    if (effects.hopeCost) resources.push(`希望-${effects.hopeCost}`);
     if (effects.hopeGain) resources.push('希望+1');
     if (effects.fearGain) resources.push('恐惧+1');
     if (effects.stressClear) resources.push('压力-1');
@@ -134,7 +122,7 @@ export function formatRoll(result, name, hints = true) {
 export function formatSettlement(before, after, fearBefore, fearAfter, effects) {
   const fields = [];
   const change = (label, a, b, cap) => a === b ? `${label}${b}/${cap}` : `${label}${a}→${b}`;
-  if (effects.hopeCost || effects.hopeGain) fields.push(change('希望', before.希望, after.希望, 6));
+  if (effects.hopeGain) fields.push(change('希望', before.希望, after.希望, 6));
   if (effects.stressClear) fields.push(before.压力 === after.压力 ? `压力${after.压力}` : `压力${before.压力}→${after.压力}`);
   if (effects.fearGain) fields.push(change('恐惧', fearBefore, fearAfter, 12));
   return fields.join(' ｜ ');

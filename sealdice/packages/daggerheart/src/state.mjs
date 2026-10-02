@@ -4,10 +4,9 @@ export function bounded(value, maximum, label) {
 }
 export function settleOptional(values, effects, fear) {
   const next = { ...values };
-  if (effects.hopeCost || effects.hopeGain) {
+  if (effects.hopeGain) {
     bounded(next.希望, 6, '希望');
-    if (next.希望 < effects.hopeCost) throw new Error('希望不足');
-    next.希望 = Math.min(6, next.希望 - effects.hopeCost + effects.hopeGain);
+    next.希望 = Math.min(6, next.希望 + effects.hopeGain);
   }
   if (effects.stressClear) next.压力 = Math.max(0, bounded(next.压力, Number.MAX_SAFE_INTEGER, '压力') - effects.stressClear);
   if (effects.fearGain) fear = Math.min(12, bounded(fear, 12, 'GM恐惧') + effects.fearGain);

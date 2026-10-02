@@ -1,7 +1,7 @@
-name: daggerheart-native
+name: daggerheart
 fullName: 匕首之心正式版核心
 authors: [Daggerheart workspace]
-version: 0.3.0
+version: 0.3.1
 templateVer: "2.0"
 updatedTime: "2026-10-02"
 attrs:
@@ -37,11 +37,11 @@ commands:
   set:
     diceSides: "20"
     enableTip: ".dd：掷骰；.ddr：反应掷骰。"
-    keys: [dh, daggerheart-native, 匕首之心]
-    relatedExt: [daggerheart-native]
+    keys: [dh, daggerheart, 匕首之心]
+    relatedExt: [daggerheart]
   sn: {}
   st:
     show:
       top: [敏捷, 力量, 灵巧, 本能, 风度, 知识, 生命, 压力, 护甲, 希望, 恐惧, 金币]
       sortBy: name
-      itemsPerLine: 3
+      itemsPerLine: 4

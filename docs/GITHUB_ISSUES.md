@@ -10,7 +10,7 @@
 - [#4 P2：在 Chat 增减动态资源并与 Dice/.st 同步](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/4) — 阻塞：#3
 - [#5 P1：维护有权限边界的共享 GM 恐惧池](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/5) — 阻塞：#1
 - [#6 P1：让 .dd 自动结算资源并刷新 Chat](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/6) — 阻塞：#4, #5
-- [#7 P2：选择 PbDH 经历并付费用于检定](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/7) — 阻塞：#6
+- [#7 P2：选择 PbDH 经历并付费用于检定](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/7) — 阻塞：#6；已取消自动经历处理，使用普通数字修正与手动.st扣费
 - [#8 P3：在昵称 label 显示玩家资源和 GM 恐惧点](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/8) — 阻塞：#4, #5
 - [#9 P4：通过骰子命令查询匕首之心术语和核心速查](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/9) — 阻塞：#1
 - [#10 P4：在 Chat 人物卡中查看统一术语与速查](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues/10) — 阻塞：#3, #9

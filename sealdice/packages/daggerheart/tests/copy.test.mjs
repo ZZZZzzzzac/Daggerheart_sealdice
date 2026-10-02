@@ -15,8 +15,8 @@ test('reaction and no difficulty do not invent outcomes or append explanations',
 });
 test('settlement only shows affected resources, including saturated gains', () => {
   assert.equal(formatSettlement({ 希望: 2, 压力: 2 }, { 希望: 3, 压力: 1 }, 5, 5,
-    { hopeCost: 0, hopeGain: 1, stressClear: 1, fearGain: 0 }), '希望2→3 ｜ 压力2→1');
+    { hopeGain: 1, stressClear: 1, fearGain: 0 }), '希望2→3 ｜ 压力2→1');
   assert.equal(formatSettlement({ 希望: 6, 压力: 0 }, { 希望: 6, 压力: 0 }, 12, 12,
-    { hopeCost: 0, hopeGain: 1, stressClear: 1, fearGain: 0 }), '希望6/6 ｜ 压力0');
-  assert.equal(formatSettlement({}, {}, 5, 5, { hopeCost: 0, hopeGain: 0, stressClear: 0, fearGain: 0 }), '');
+    { hopeGain: 1, stressClear: 1, fearGain: 0 }), '希望6/6 ｜ 压力0');
+  assert.equal(formatSettlement({}, {}, 5, 5, { hopeGain: 0, stressClear: 0, fearGain: 0 }), '');
 });
