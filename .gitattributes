@@ -1,2 +1,2 @@
-archive/sealchat-character-sheet/git-snapshot/* -text
-archive/sealchat-character-sheet/character-generator-skin/* -text
+archive/sealchat-character-sheet/git-snapshot/* -text whitespace=cr-at-eol
+archive/sealchat-character-sheet/character-generator-skin/* -text whitespace=cr-at-eol
