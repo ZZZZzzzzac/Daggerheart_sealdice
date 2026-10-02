@@ -10,8 +10,6 @@
   "scripts": {
     "build": "node tools/build-sealpack.cjs",
     "test": "node tools/build-sealpack.cjs && node --test sealdice/packages/daggerheart/tests/*.test.mjs",
-    "build:legacy": "node sealdice/plugins/duality-dice/tools/build.js",
-    "test:legacy": "node --test sealdice/plugins/duality-dice/tests/*.test.cjs",
     "check-reference": "node tools/check-reference.cjs"
   },
   "devDependencies": {

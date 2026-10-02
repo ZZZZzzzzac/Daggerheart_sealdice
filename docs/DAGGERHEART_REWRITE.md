@@ -46,4 +46,4 @@ P1基础包已在隔离官方Windows 1.6.1实例完成安装、启用、.set dh�
 - [sealpack说明](https://docs.sealdice.com/config/package.html)；包清单与模板接口以固定reference/sealdice-core为准。
 - reference/sealchat/doc/character-sheet-template-development.md 与 channel-embed-api-developer-guide.md。
 
-旧业务文件保持原内容，不由新构建引用。当前完成Dice侧0.4.1代码与本地测试，真实宿主验收结果见开发说明；P2/P3/P4尚未实现，不宣称全部需求已交付。
+旧插件已从工作目录移除，原实现由Git历史保留；新构建仅引用sealpack源码。当前完成Dice侧0.4.1代码与本地测试，真实宿主验收结果见开发说明；P2/P3/P4尚未实现，不宣称全部需求已交付。

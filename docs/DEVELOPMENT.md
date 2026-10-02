@@ -6,7 +6,7 @@
 
 npm test 会先构建sealpack，再验证144种基础二元骰组合、难度边界、优劣势抵消、反应资源规则、参数限制、宿主模拟和ZIP文件清单。npm run build使用esbuild与fflate，运行时不依赖它们。构建显式检查所有输入来自新src，资源采用白名单，不自动打包旧文件和reference。
 
-旧TS和standalone不迁移、不复用源码；旧类型声明也不引入新项目。保留build:legacy/test:legacy只供历史调查。
+旧插件、类型声明及其构建和测试入口已移除。旧功能需求见DAGGERHEART_REWRITE.md，原实现从Git历史查阅；新sealpack不复用旧源码。
 
 ## 实际宿主验收与发布
 
