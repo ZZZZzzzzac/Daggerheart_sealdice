@@ -1,0 +1,29 @@
+SealChat 匕首之心人物卡模板使用说明
+
+1. 文件位置
+- 模板文件：sheet/sealchat匕首之心人物卡模板_sealchat模板.html
+- Sealdice 插件：sheet/sealdice-js-ext-template-master/daggerheart.js
+
+2. JSON 数据来源
+- 本模板所需的角色卡 JSON 数据，来自 https://daggerheart.cn/character/ 的导出 JSON。
+- 在该网站完成角色卡编辑后，导出 JSON，再将导出的内容作为 SealChat 角色卡 attrs 数据使用。
+
+3. 基本使用方法
+- 将模板文件导入或粘贴到 SealChat 的人物卡模板中。
+- 准备好从 https://daggerheart.cn/character/ 导出的角色卡 JSON。
+- 在 SealChat 中使用该 JSON 创建或更新角色卡数据。
+- 打开角色卡后，模板会根据 JSON 中的 Textbox/Checkbox 字段显示人物信息、资源、经历、装备等内容。
+
+4. 掷骰功能
+- 模板内属性右侧的骰子按钮可直接发起掷骰。
+- 模板会直接发送 .dd 指令，由主插件统一处理希望、压力和 GM 恐惧点。
+- 如需完整聊天输出和 GM 恐惧点统计，只需在 Sealdice 中安装并启用上述 daggerheart.js 插件。
+
+5. 徽章相关
+- 模板会补写 hp、hpMax、stress、stressMax、armor、armorMax、hope、hopeMax 等派生字段。
+- 因此 SealChat 徽章模板可直接使用例如：
+  生命{hp}/{hpMax} 压力{stress}/{stressMax} 护甲{armor}/{armorMax} 希望{hope}/{hopeMax}
+
+6. 说明
+- 本方案优先通过模板和插件配合实现，不依赖修改 SealChat 本体。
+- 如果 JSON 字段结构和 daggerheart.cn 当前导出格式差异较大，模板可能需要继续调整字段映射。

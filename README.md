@@ -1,62 +1,28 @@
-# 海豹js扩展模板
+# Daggerheart Seal 开发工作区
 
+按用户要求从零重写匕首之心扩展：旧业务代码只用于提取功能与需求，不迁移、不作为新构建依赖。默认正式版核心，额外玩法独立可选。PbDH通过.pbcha提供角色静态资料，静态编辑和升级在PbDH完成；Dice/Chat维护跑团动态资源与昵称标签。生产配置仍在旁边的 Daggerheart_VPS 仓库。
 
-### 介绍
+| 目录 | 用途 |
+| --- | --- |
+| sealdice/packages/daggerheart/ | 全新的原生 sealpack，当前0.2.0支持.dd/.ddr、.st资源及GM恐惧池 |
+| sealchat/ | 人物卡与互动工具开发入口，尚未重写 |
+| sealdice/plugins/duality-dice/ | 原TS业务文件与旧构建，原样保留作需求参考 |
+| sealdice/plugins/standalone/ | 三个旧独立JS，原样保留作需求参考 |
+| reference/ | 对应服务器版本的只读源码与版本清单 |
+| docs/DAGGERHEART_REWRITE.md | 功能提取、四个优先级、实现范围与剩余验收 |
+| archive/ | 旧开发环境文档和产物，不作为开发入口 |
 
-一个简单易用的项目模板。
+Node.js 22或更新的受支持LTS，在根目录：
 
-使用esbuild编译代码，并将多个源码文件打包成一个。
-
-
-### 如何使用
-
-clone或下载项目，随后:
-
-```
-npm install
+```powershell
+npm ci
+npm test
 npm run build
+npm run check-reference
 ```
 
-好的，现在你的项目被编译成功了，就在dist目录。
+产物：[daggerheart-core-0.2.0.sealpack](sealdice/packages/daggerheart/dist/daggerheart-core-0.2.0.sealpack)。测试涵盖规则、宿主模拟与ZIP结构，已完成隔离官方SealDice1.6.1加载验收，SealChat联动尚未实现；不自动上传生产。无需Chat即可用.dd和原生.st；资源完整且指定GM时自动结算，否则提示手动处理。Chat人物卡尚未接入；援助确认不在当前计划。
 
-默认的名字是`sealdce-js-ext.js`，其逻辑写在src/index.ts
+旧环境仅留 build:legacy / test:legacy 供历史调查，不继续在旧代码上迭代。新工作按[重写需求](docs/DAGGERHEART_REWRITE.md)、[开发指南](docs/DEVELOPMENT.md)和[只读参考约束](reference/AGENTS.md)推进。
 
-
-### 开发指南
-
-看这里，这边有大量的例子，以及海豹用户写的插件：
-
-https://github.com/sealdice/javascript
-
-由于无法动态调试，建议将纯逻辑部分独立编写，随后你就可以在调试编译后，用nodejs去验证你的想法:
-
-```
-npm run build-dev
-node ./dev/sealdice-js-ext.js
-```
-
-当然，不止是node，任何其他js环境都行，浏览器里也行。
-
-
-### 填写个人信息
-
-当插件开发完成后(或者开始开发时)，你需要修改几处地方：
-
-* header.txt 这个文件是你插件的描述信息
-
-* tools/build-config.js 最开头一行"var filename = 'sealdce-js-ext.js';"，改成你中意的名字，注意不要与现有的重名
-
-
-### 编译和发布
-
-```
-npm run build
-```
-
-从dist目录找出你的编译结果，将其装入海豹测试并分享即可！
-
-当然，你也可以把你的劳动成果提交到这里：
-
-https://github.com/sealdice/javascript/tree/main/scripts
-
-这样用户就可以直接在海豹的插件面板进行安装了。
+计划已发布到[GitHub Issues](docs/GITHUB_ISSUES.md)，阻塞依赖以GitHub原生关系为准。

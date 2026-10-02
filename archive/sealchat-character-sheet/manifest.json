@@ -1,0 +1,33 @@
+{
+  "recovered_on": "2026-10-02",
+  "git_source": "../Daggerheart_VPS",
+  "git_commit": "f7f1a66aaa5be06429a4aa5ec5bfce27172ddf4f",
+  "deleted_in": "1577bd5",
+  "purpose": "Read-only requirement references; no code reuse or production deployment",
+  "files": [
+    {
+      "source": "sillytavern/sealchat/sheet/sealchat匕首之心人物卡模板_sealchat模板.html",
+      "destination": "git-snapshot/sealchat匕首之心人物卡模板_sealchat模板.html",
+      "sha256": "5d028865632cd24f5f33605d6ca7ee02da74a06c8fbfe6416e455168d5554fcc",
+      "bytes": 55194
+    },
+    {
+      "source": "sillytavern/sealchat/sheet/sealchat匕首之心人物卡模板_使用说明.txt",
+      "destination": "git-snapshot/sealchat匕首之心人物卡模板_使用说明.txt",
+      "sha256": "91ab59b13b594af3b6968a681be5ad6997dfd084b584331d3f0c2bc4455d5c12",
+      "bytes": 1626
+    },
+    {
+      "source": "sillytavern/sealchat/sheet/啄鵺_匕首之心人物卡_zzz.json",
+      "destination": "private/啄鵺_匕首之心人物卡_zzz.json",
+      "sha256": "adeab09b18e47c36dffba6ebaf2182a40533d51b875178f074076b3590c6076e",
+      "bytes": 17411
+    },
+    {
+      "source": "D:\\Game\\Daggerheart\\DaggerHeart_Character\\skin\\SEALCHAT_BRIDGE\\index.html",
+      "destination": "character-generator-skin/index.html",
+      "sha256": "087ede2fab5fcd8c2a139242983b4f94df3e8e4b7ece5cf7288ee5ebd3900aa4",
+      "bytes": 43718
+    }
+  ]
+}

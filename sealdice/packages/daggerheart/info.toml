@@ -1,0 +1,26 @@
+format_version = "1.0.0"
+
+[package]
+id = "daggerheart-local/core"
+name = "匕首之心 · 核心与资源"
+version = "0.2.0"
+authors = ["Daggerheart workspace"]
+license = "Apache-2.0"
+description = "正式版核心检定、玩家动态资源、频道GM恐惧池与可恢复结算。"
+
+[package.seal]
+min_version = "1.6.1"
+
+[permissions]
+network = false
+dangerous = false
+http_server = false
+file_read = []
+file_write = []
+
+[contents]
+scripts = ["scripts/daggerheart.js"]
+templates = ["templates/daggerheart.yaml"]
+
+[store]
+readme = "README.md"
