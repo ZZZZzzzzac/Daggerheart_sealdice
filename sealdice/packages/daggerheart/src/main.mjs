@@ -1,9 +1,10 @@
 import { parseRequest, rollRequest, formatRoll, formatSettlement } from './rules.mjs';
+import { evaluateNative } from './expression.mjs';
 import { bounded, settleOptional, parseGroupState } from './state.mjs';
 
-const VERSION = '0.3.1';
-const HELP = `.dd [属性] [修正] [adv/dis] [dc难度] [-- 原因]
-例：.dd 敏捷 +2 adv dc15 -- 攀爬
+const VERSION = '0.4.0';
+const HELP = `.dd [算式] [adv/dis] [dc难度] [-- 原因]
+例：.dd 敏捷+2+2d6k1 adv dc15 -- 攀爬
 .ddr：反应掷骰；.st：属性与资源；.dh gm：指定GM。`;
 const GM_HELP = `.dh gm claim：自己担任GM
 .dh gm set 用户ID：指定GM；.dh gm clear：卸任
@@ -81,14 +82,12 @@ function recover(ctx) {
 }
 function doRoll(ctx, msg, args, reaction) {
   const request = parseRequest(args, reaction);
-  const traitValue = request.trait ? read(ctx, request.trait) : 0;
-  if (traitValue === null) throw new Error(`请用.st设置属性“${request.trait}”`);
   return mutation(ctx, msg, state => {
     const hope = !reaction ? optional(ctx, '希望', 6) : null;
     const stress = !reaction ? optional(ctx, '压力', Number.MAX_SAFE_INTEGER) : null;
     const gm = !reaction && state.gm && !ctx.isPrivate && ctx.group?.groupId ? target(ctx, state.gm) : null;
     const fear = gm ? optional(gm, '恐惧', 12) ?? 0 : null;
-    const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, traitValue);
+    const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, expression => evaluateNative(ctx, expression));
     const effects = { ...result.effects, hopeGain: hope === null ? 0 : result.effects.hopeGain,
       stressClear: stress === null ? 0 : result.effects.stressClear, fearGain: gm ? result.effects.fearGain : 0 };
     const before = { 希望: hope, 压力: stress }, next = settleOptional(before, effects, fear);

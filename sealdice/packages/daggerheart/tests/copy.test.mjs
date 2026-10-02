@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseRequest, rollRequest, formatRoll, formatSettlement } from '../src/rules.mjs';
-test('short roll preserves dice, modifiers, advantage, difficulty and result', () => {
-  const dice = [9, 5, 3, 4];
-  const result = rollRequest(parseRequest(['敏捷', '+2', '-1d4', 'adv', 'dc15', '--', '攀爬']), () => dice.shift(), 3);
-  assert.equal(formatRoll(result, '林'), '【林】掷骰 · 希望成功 · 攀爬\n希望9+恐惧5+敏捷3+2-1d4[3]+优势4=20 / 难度15\n手动：希望+1');
-  assert.equal(formatRoll(result, '林', false).split('\n').length, 2);
+test('compact roll retains native expression, numeric subtotal, advantage, difficulty and result', () => {
+  const dice=[9,5,4];
+  const result=rollRequest(parseRequest(['敏捷+2-1d4','adv','dc15','--','攀爬']),()=>dice.shift(),()=>({value:2,expression:'敏捷+2-1d4'}));
+  assert.equal(formatRoll(result,'林'),'【林】掷骰 · 希望成功 · 攀爬\n希望9+恐惧5+(敏捷+2-1d4)[2]+优势4=20 / 难度15\n手动：希望+1');
+  assert.equal(formatRoll(result,'林',false).split('\n').length,2);
 });
 test('reaction and no difficulty do not invent outcomes or append explanations', () => {
   const dice = [3, 7];

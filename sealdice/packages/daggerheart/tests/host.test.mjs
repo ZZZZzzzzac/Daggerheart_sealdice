@@ -12,7 +12,12 @@ function host(initial = {}, shared = new Map()) {
   const cards = new Map(), replies = [];
   const attrs = (u = user, g = group) => { const key = `${g}|${u}`; if (!cards.has(key)) cards.set(key, new Map()); return cards.get(key); };
   for (const [k, v] of Object.entries(initial)) attrs().set(k, v);
-  const context = (u = user, g = group) => ({ player: { userId: u, name: '玩家' }, group: { groupId: g }, endPoint: { userId: 'SEALCHAT:BOT' }, privilegeLevel: privilege });
+  const context = (u = user, g = group) => ({ genDefaultRollVmConfig: () => ({}), eval: expr => {
+    const inner=expr.slice(1,-1).trim();
+    const values={ '+2':2, 敏捷:attrs(u,g).get('敏捷') ?? 0 };
+    const v=Object.prototype.hasOwnProperty.call(values,inner)?values[inner]:null;
+    return { toJSON: () => Array.from(new TextEncoder().encode(JSON.stringify({t:0,v}))) };
+  }, player: { userId: u, name: '玩家' }, group: { groupId: g }, endPoint: { userId: 'SEALCHAT:BOT' }, privilegeLevel: privilege });
   const data = ctx => attrs(ctx.player.userId, ctx.group.groupId);
   const sandbox = { Math: Object.assign(Object.create(Math), { random: () => { rolls++; return ((dice.shift() ?? 2) - 0.5) / 12; } }),
     seal: { ext: { new: () => ({ cmdMap: {}, storageGet: k => shared.get(k) || '', storageSet: (k,v) => shared.set(k,v) }),
@@ -33,7 +38,7 @@ function host(initial = {}, shared = new Map()) {
 test('plain dd needs no resource fields or GM and never creates optional fields', () => {
   const h=host(); h.run('dd',[]); assert.equal(h.rolls,2); assert.match(h.replies.at(-1),/手动：希望\+1、压力-1/);
   assert.equal(h.attrs().has('希望'),false); assert.equal(h.attrs().has('压力'),false);
-  h.dice(8,3); h.run('dd',['敏捷']); assert.match(h.replies.at(-1),/敏捷0/);
+  h.dice(8,3); h.run('dd',['敏捷']); assert.match(h.replies.at(-1),/敏捷\)\[0\]/);
 });
 test('hope and stress settle independently with no GM, caps or unrelated resources', () => {
   const hope=host({ 希望:2 }); hope.run('dd',[]); assert.equal(hope.attrs().get('希望'),3); assert.equal(hope.attrs().has('压力'),false);
@@ -104,7 +109,7 @@ test('invalid options, other mentions and corrupt state fail before rolling', ()
   h.shared.set('dh:v1:SEALCHAT:ROOM','{bad'); h.run('dd',[]); assert.equal(h.rolls,0);
 });
 test('archive includes only native package files and optional fields have no defaults', () => {
-  const zip=unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.3.1.sealpack',import.meta.url)));
+  const zip=unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.4.0.sealpack',import.meta.url)));
   assert.deepEqual(Object.keys(zip).sort(),['README.md','info.toml','scripts/daggerheart.js','templates/daggerheart.yaml']);
   const yaml=strFromU8(zip['templates/daggerheart.yaml']); assert.match(yaml,/恐惧: \[fear\]/);
   assert.doesNotMatch(yaml,/    (希望|压力|恐惧): [0-9]/); assert.match(yaml,/希望: "null"/); new vm.Script(strFromU8(zip['scripts/daggerheart.js']));
