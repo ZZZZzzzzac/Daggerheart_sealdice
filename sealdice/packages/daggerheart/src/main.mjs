@@ -1,22 +1,15 @@
 import { parseRequest, rollRequest, formatRoll, formatSettlement } from './rules.mjs';
-import { RESOURCES, canonicalResource, bounded, validateResources, adjustResource, settle, resourceSummary, parseGroupState } from './state.mjs';
+import { bounded, settleOptional, parseGroupState } from './state.mjs';
 
-const VERSION = '0.2.1';
+const VERSION = '0.3.0';
 const HELP = `.dd [属性] [修正] [adv/dis] [dc难度] [exp:经历ID] [-- 原因]
 例：.dd 敏捷 +2 adv dc15 -- 攀爬
-.ddr：反应掷骰；.st：属性与资源；.dh help：资源指令。`;
-const RESOURCE_HELP = `.dh status：查看资源；.dh 希望 -1：增减资源（生命/压力/护甲/希望/金币）
-.dh fear [+N/-N/=N]：恐惧池；.st：属性与资源
-.dh gm claim：认领GM；.dh gm set 用户ID：交接；.dh gm clear：解除
-.dh experience：查看经历；.dh rule 核心：规则速查
-.dh recover：恢复上次操作`;
+.ddr：反应掷骰；.st：属性与资源；.dh gm：指定GM。`;
+const GM_HELP = `.dh gm claim：自己担任GM
+.dh gm set 用户ID：指定GM；.dh gm clear：卸任
+.st 恐惧+1：调整GM自己的恐惧`;
 const ext = seal.ext.new('daggerheart-native', 'Daggerheart workspace', VERSION);
-const keyFor = ctx => {
-  if (ctx.isPrivate || !ctx.group?.groupId) throw new Error('请在群聊中使用');
-  if (!ctx.player?.userId) throw new Error('无法确认玩家身份');
-  return `dh:v1:${ctx.group.groupId}`;
-};
-const DEFAULTS = { 敏捷: 0, 力量: 0, 灵巧: 0, 本能: 0, 风度: 0, 知识: 0, 生命: 0, 压力: 0, 护甲: 0, 希望: 2, 金币: 0, 护甲上限: 0 };
+const DEFAULTS = { 敏捷: 0, 力量: 0, 灵巧: 0, 本能: 0, 风度: 0, 知识: 0 };
 const read = (ctx, key, type = 'int') => {
   const [value, exists] = type === 'str' ? seal.vars.strGet(ctx, key) : seal.vars.intGet(ctx, key);
   if (exists) return value;
@@ -27,70 +20,63 @@ const read = (ctx, key, type = 'int') => {
   }
   return null;
 };
-const write = (ctx, key, value, type) => type === 'str' ? seal.vars.strSet(ctx, key, value) : seal.vars.intSet(ctx, key, value);
+function optional(ctx, key, cap) {
+  const value = read(ctx, key);
+  if (value !== null) return bounded(value, cap, key);
+  if (seal.vars.strGet(ctx, key)[1] || (seal.vars.computedGet && seal.vars.computedGet(ctx, key)[1])) throw new Error(`${key}必须为整数`);
+  return null;
+}
+const keyFor = ctx => ctx.isPrivate || !ctx.group?.groupId ? `dh:v1:private:${ctx.player.userId}` : `dh:v1:${ctx.group.groupId}`;
 const load = ctx => parseGroupState(ext.storageGet(keyFor(ctx)));
 const save = (ctx, state) => ext.storageSet(keyFor(ctx), JSON.stringify(state));
-function readyResources(ctx) {
-  try { return readResources(ctx); } catch { return null; }
+function target(ctx, user) {
+  if (ctx.player.userId === user) return ctx;
+  const message = seal.newMessage();
+  message.messageType = 'group'; message.groupId = ctx.group.groupId; message.sender.userId = user;
+  const result = seal.createTempCtx(ctx.endPoint, message);
+  if (!result?.player || result.player.userId !== user || result.group?.groupId !== ctx.group.groupId) throw new Error('无法定位GM人物卡');
+  return result;
 }
-function readResources(ctx, initialize = false) {
-  const caps = {};
-  const values = {};
-  for (const [key, spec] of Object.entries(RESOURCES)) {
-    if (spec.max) caps[spec.max] = read(ctx, spec.max);
-    values[key] = read(ctx, key);
-    if (initialize && values[key] === null) values[key] = key === '希望' ? 2 : 0;
+function role(ctx) {
+  let value = read(ctx, 'DH角色标识', 'str');
+  if (!value) {
+    value = `${keyFor(ctx)}|${ctx.player.userId}|${Date.now()}|${Math.random()}`;
+    seal.vars.strSet(ctx, 'DH角色标识', value);
   }
-  return { values: validateResources(values, caps), caps };
+  return value;
 }
-function changes(ctx, after, types = {}) {
-  return Object.entries(after).map(([key, value]) => ({ key, before: read(ctx, key, types[key] || 'int'), after: value, type: types[key] || 'int' }));
-}
-function requestKey(ctx, msg) {
-  // No fabricated ID: adapters without stable message IDs cannot guarantee retry deduplication.
-  const id = msg.rawId;
-  return id === undefined || id === null || id === '' ? '' : JSON.stringify([ctx.player.userId, String(id)]);
-}
+const changes = (ctx, values) => Object.entries(values).map(([key, after]) => ({ user: ctx.player.userId, role: role(ctx), key, before: read(ctx, key), after }));
+const requestKey = (ctx, msg) => msg.rawId === undefined || msg.rawId === null || msg.rawId === '' ? '' : JSON.stringify([ctx.player.userId, String(msg.rawId)]);
 function mutation(ctx, msg, build) {
-  const state = load(ctx);
-  const id = requestKey(ctx, msg);
-  if (id) {
-    const receipt = state.receipts.find(item => item.id === id);
-    if (receipt) return receipt.reply + '（重复消息）';
-  }
+  const state = load(ctx), id = requestKey(ctx, msg);
+  const receipt = id && state.receipts.find(item => item.id === id);
+  if (receipt) return receipt.reply + '（重复消息）';
   if (state.pending) throw new Error('上次操作未完成，请原玩家执行 .dh recover');
-  const plan = build(state);
-  const patch = plan.writes || [];
-  // A durable intent bridges the separately persisted attribute and extension stores.
-  // This is not a database transaction/CAS with external .st or character.set writers.
-  if (patch.length && !read(ctx, 'DH角色标识', 'str')) {
-    // Metadata identifies the current attribute sheet for interrupted-operation recovery.
-    seal.vars.strSet(ctx, 'DH角色标识', `${ctx.group.groupId}|${ctx.player.userId}|${Date.now()}|${state.revision}`);
-  }
-  const pending = { owner: ctx.player.userId, role: read(ctx, 'DH角色标识', 'str'), writes: patch, id,
-    gm: plan.gm ?? state.gm, fear: plan.fear ?? state.fear, reply: plan.reply };
+  const plan = build(state), writes = plan.writes || [];
+  const pending = { owner: ctx.player.userId, role: writes.length ? role(ctx) : read(ctx, 'DH角色标识', 'str'), writes, id,
+    gm: plan.gm ?? state.gm, reply: plan.reply };
   save(ctx, { ...state, pending });
   try {
-    for (const item of patch) write(ctx, item.key, item.after, item.type);
+    for (const item of writes) seal.vars.intSet(target(ctx, item.user), item.key, item.after);
     const receipts = id ? [...state.receipts, { id, reply: plan.reply }].slice(-100) : state.receipts;
-    save(ctx, { ...state, gm: pending.gm, fear: pending.fear, revision: state.revision + 1, receipts, pending: null });
+    save(ctx, { ...state, gm: pending.gm, revision: state.revision + 1, receipts, pending: null });
   } catch { throw new Error('保存失败，请执行 .dh recover，勿重投'); }
   return plan.reply;
 }
 function recover(ctx) {
   const state = load(ctx), pending = state.pending;
-  if (!pending) return '没有待恢复操作。';
+  if (!pending) return '没有待恢复操作';
   if (pending.owner !== ctx.player.userId) throw new Error('请由原玩家恢复');
-  const currentRole = read(ctx, 'DH角色标识', 'str');
-  const newRole = pending.writes.find(item => item.key === 'DH角色标识')?.after;
-  if (currentRole !== pending.role && currentRole !== newRole) throw new Error('请切回原角色后恢复');
-  for (const item of pending.writes) {
-    const current = read(ctx, item.key, item.type);
-    if (current !== item.before && current !== item.after) throw new Error(`${item.key}已变动，请联系骰主恢复`);
+  if (read(ctx, 'DH角色标识', 'str') !== pending.role) throw new Error('请切回原角色后恢复');
+  const targets = pending.writes.map(item => ({ item, ctx: target(ctx, item.user) }));
+  for (const { item, ctx: dest } of targets) {
+    if (read(dest, 'DH角色标识', 'str') !== item.role) throw new Error('请让GM和玩家切回原角色后恢复');
+    const value = read(dest, item.key);
+    if (value !== item.before && value !== item.after) throw new Error(`${item.key}已变动，请联系骰主恢复`);
   }
-  for (const item of pending.writes) write(ctx, item.key, item.after, item.type);
+  for (const { item, ctx: dest } of targets) seal.vars.intSet(dest, item.key, item.after);
   const receipts = pending.id ? [...state.receipts, { id: pending.id, reply: pending.reply }].slice(-100) : state.receipts;
-  save(ctx, { ...state, gm: pending.gm, fear: pending.fear, revision: state.revision + 1, receipts, pending: null });
+  save(ctx, { ...state, gm: pending.gm, revision: state.revision + 1, receipts, pending: null });
   return pending.reply + '（已恢复）';
 }
 function experiences(ctx) {
@@ -108,9 +94,9 @@ function experiences(ctx) {
   }
   return entries;
 }
-function prepareRoll(ctx, args, reaction) {
+function doRoll(ctx, msg, args, reaction) {
   const request = parseRequest(args, reaction);
-  if (request.terms.some(item => item.kind === 'experience' && !item.id)) throw new Error('经历格式：exp:ID（.dh experience 查看）');
+  if (request.terms.some(item => item.kind === 'experience' && !item.id)) throw new Error('经历格式：exp:ID');
   if (request.experienceIds.length) {
     const entries = experiences(ctx);
     for (const id of request.experienceIds) {
@@ -119,100 +105,57 @@ function prepareRoll(ctx, args, reaction) {
       request.terms.push({ kind: 'experience', id, value: entry.value, name: entry.name });
     }
   }
-  let traitValue = 0;
-  if (request.trait) {
-    traitValue = read(ctx, request.trait);
-    if (traitValue === null) throw new Error(`请用.st设置属性“${request.trait}”`);
-  }
-  return { request, traitValue };
-}
-function doRoll(ctx, msg, args, reaction) {
-  // Parse first, including invalid parameters, before checking state or rolling.
-  const { request, traitValue } = prepareRoll(ctx, args, reaction);
-  const resources = readyResources(ctx);
-  const inGroup = !ctx.isPrivate && !!ctx.group?.groupId;
-  const state = resources && inGroup ? load(ctx) : null;
-  const automatic = resources && inGroup && (reaction || state.gm);
-  if (!automatic) {
-    if (request.experienceCosts) throw new Error('请先用.st设置资源，并在群聊中使用经历');
-    const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, traitValue);
-    return formatRoll(result, ctx.player.name, true);
-  }
+  const traitValue = request.trait ? read(ctx, request.trait) : 0;
+  if (traitValue === null) throw new Error(`请用.st设置属性“${request.trait}”`);
   return mutation(ctx, msg, state => {
-    const { values, caps } = readResources(ctx);
-    if (!reaction && !state.gm) throw new Error('请先指定GM：.dh gm claim / set');
-    if (values.希望 < request.experienceCosts) throw new Error('希望不足');
+    const hope = !reaction || request.experienceCosts ? optional(ctx, '希望', 6) : null;
+    const stress = !reaction ? optional(ctx, '压力', Number.MAX_SAFE_INTEGER) : null;
+    if (request.experienceCosts && (hope === null || hope < request.experienceCosts)) throw new Error('希望不足');
+    const gm = !reaction && state.gm && !ctx.isPrivate && ctx.group?.groupId ? target(ctx, state.gm) : null;
+    const fear = gm ? optional(gm, '恐惧', 12) ?? 0 : null;
     const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, traitValue);
-    const next = settle(values, caps, result.effects, state.fear);
-    const summary = formatSettlement(values, next.values, state.fear, next.fear, result.effects);
-    return { writes: changes(ctx, { 希望: next.values.希望, 压力: next.values.压力 }), fear: next.fear,
-      reply: formatRoll(result, ctx.player.name, false) + (summary ? '\n' + summary : '') };
+    const effects = { ...result.effects, hopeGain: hope === null ? 0 : result.effects.hopeGain,
+      stressClear: stress === null ? 0 : result.effects.stressClear, fearGain: gm ? result.effects.fearGain : 0 };
+    const before = { 希望: hope, 压力: stress }, next = settleOptional(before, effects, fear);
+    const values = {};
+    if (effects.hopeGain || effects.hopeCost) values.希望 = next.values.希望;
+    if (effects.stressClear) values.压力 = next.values.压力;
+    const writes = changes(ctx, values);
+    if (effects.fearGain) writes.push(...changes(gm, { 恐惧: next.fear }));
+    const summary = formatSettlement(before, next.values, fear, next.fear, effects);
+    const manual = [];
+    if (result.effects.hopeGain && hope === null) manual.push('希望+1');
+    if (result.effects.stressClear && stress === null) manual.push('压力-1');
+    if (result.effects.fearGain && !gm) manual.push('恐惧+1');
+    const tail = [summary, manual.length ? `手动：${manual.join('、')}` : ''].filter(Boolean).join(' ｜ ');
+    return { writes, reply: formatRoll(result, ctx.player.name, false) + (tail ? '\n' + tail : '') };
   });
 }
-function canManageGM(ctx, state) { return ctx.player.userId === state.gm || ctx.privilegeLevel >= 50; }
-function canManageFear(ctx, state) { return ctx.player.userId === state.gm || ctx.privilegeLevel >= 100; }
-function resourceCommand(ctx, msg, args) {
-  const sub = (args[0] || 'status').toLowerCase();
-  if (sub === 'help' || sub === '帮助') return RESOURCE_HELP;
-  if (sub === 'rule' || sub === '规则') {
-    if (args.length > 2 || (args[1] && !['核心', 'core'].includes(args[1]))) throw new Error('用法：.dh rule 核心');
-    return '正式版核心速查：二元骰为希望d12+恐惧d12。相同出目关键成功；否则与难度比较，希望骰较高则获得希望，恐惧骰较高则GM获得恐惧。普通优劣势来源抵消后至多一枚d6。关键成功获得1希望并清除1压力；反应不产生希望/恐惧，也不清压力。每项经历先消耗1希望。希望上限6，GM恐惧上限12。\n依据：官方SRD 2.0核心第47–49页 https://www.daggerheart.com/srd/';
-  }
-  if (sub === 'recover') {
-    if (args.length !== 1) throw new Error('格式：.dh recover');
-    return recover(ctx);
-  }
-  if (sub === 'gm') {
-    const state = load(ctx);
-    if (args.length === 1) return `当前GM：${state.gm || '未指定'} ｜ 恐惧 ${state.fear}/12`;
-    if (args.length > 3) throw new Error('格式：.dh gm claim / set 用户ID / clear');
-    return mutation(ctx, msg, current => {
-      let gm;
-      if (args[1] === 'claim' && args.length === 2) {
-        if (current.gm && current.gm !== ctx.player.userId) throw new Error('已有GM，请由GM或管理员交接');
-        if (!current.gm && ctx.privilegeLevel < 50) throw new Error('认领GM需要群管理权限');
-        gm = ctx.player.userId;
-      } else if (args[1] === 'set' && args.length === 3) {
-        if (!canManageGM(ctx, current)) throw new Error('只有GM或群管理员可以指定GM');
-        if (!/^[A-Z][A-Z0-9_-]*:[^\s]{1,100}$/.test(args[2])) throw new Error('请输入平台完整用户ID，如 SEALCHAT:xxx');
-        gm = args[2];
-      } else if (args[1] === 'clear' && args.length === 2) {
-        if (!canManageGM(ctx, current)) throw new Error('只有GM或群管理员可以解除GM');
-        gm = '';
-      } else throw new Error('格式：.dh gm claim / set 用户ID / clear');
-      return { gm, reply: `GM${gm ? '：' + gm : '已解除'} ｜ 恐惧${current.fear}/12` };
-    });
-  }
-  if (sub === 'fear' || sub === '恐惧') {
-    if (args.length === 1) return `GM恐惧 ${load(ctx).fear}/12`;
-    if (args.length !== 2 || !/^(?:[+-]\d+|=\d+)$/.test(args[1])) throw new Error('格式：.dh fear +N / -N / =N');
-    return mutation(ctx, msg, state => {
-      if (!canManageFear(ctx, state)) throw new Error('只有当前GM或骰主可修改恐惧');
-      const fear = args[1][0] === '=' ? Number(args[1].slice(1)) : state.fear + Number(args[1]);
-      bounded(fear, 12, 'GM恐惧');
-      return { fear, reply: `GM恐惧 ${state.fear} → ${fear}/12` };
-    });
-  }
-  if (sub === 'experience' || sub === '经历') {
-    if (args.length !== 1) throw new Error('用法：.dh experience');
-    return experiences(ctx).map(item => `${item.id}：${item.name} +${item.value}`).join('\n') || '尚无经历';
-  }
-  if (sub === 'status' || sub === '状态') {
-    if (args.length !== 1) throw new Error('格式：.dh status');
-    const state = load(ctx), { values, caps } = readResources(ctx);
-    return resourceSummary(values, caps) + ` ｜ GM恐惧 ${state.fear}/12` + (state.pending ? ' ｜ 待恢复：.dh recover' : '');
-  }
-  const resource = canonicalResource(sub);
-  if (!resource || args.length !== 2) throw new Error('用法：.dh 资源 +N/-N/=N');
+function gmCommand(ctx, msg, args) {
+  if (args[0] === 'recover' && args.length === 1) return recover(ctx);
+  if (ctx.isPrivate || !ctx.group?.groupId) throw new Error('请在群聊中指定GM');
+  if (args[0] !== 'gm') throw new Error('用法：.dh gm claim / set 用户ID / clear');
+  if (args.length === 1) return `GM：${load(ctx).gm || '未指定'}`;
   return mutation(ctx, msg, state => {
-    const { values, caps } = readResources(ctx);
-    const next = adjustResource(values, caps, resource, args[1]);
-    return { writes: changes(ctx, { [resource]: next[resource] }), reply: `${resource}${values[resource]}→${next[resource]}` };
+    let gm;
+    const manager = state.gm === ctx.player.userId || ctx.privilegeLevel >= 50;
+    if (args[1] === 'claim' && args.length === 2) {
+      if (state.gm && state.gm !== ctx.player.userId) throw new Error('已有GM，请由GM或管理员交接');
+      if (!state.gm && ctx.privilegeLevel < 50) throw new Error('指定GM需要群管理权限');
+      gm = ctx.player.userId;
+    } else if (args[1] === 'set' && args.length === 3) {
+      if (!manager) throw new Error('只有GM或群管理员可以指定GM');
+      if (!/^[A-Z][A-Z0-9_-]*:[^\s]{1,100}$/.test(args[2])) throw new Error('请输入完整用户ID，如 SEALCHAT:xxx');
+      gm = args[2];
+    } else if (args[1] === 'clear' && args.length === 2) {
+      if (!manager) throw new Error('只有GM或群管理员可以卸任GM');
+      gm = '';
+    } else throw new Error('用法：.dh gm claim / set 用户ID / clear');
+    return { gm, reply: gm ? `GM：${gm}` : 'GM已卸任' };
   });
 }
 function register(name, help, execute) {
-  const cmd = seal.ext.newCmdItemInfo();
-  cmd.name = name; cmd.help = help;
+  const cmd = seal.ext.newCmdItemInfo(); cmd.name = name; cmd.help = help;
   cmd.solve = (ctx, msg, cmdArgs) => {
     const args = Array.from(cmdArgs.args || []);
     if (args.length === 1 && ['help', '帮助'].includes(args[0].toLowerCase())) {
@@ -231,5 +174,5 @@ function register(name, help, execute) {
 }
 register('dd', HELP, (ctx, msg, args) => doRoll(ctx, msg, args, false));
 register('ddr', HELP, (ctx, msg, args) => doRoll(ctx, msg, args, true));
-register('dh', RESOURCE_HELP, resourceCommand);
+register('dh', GM_HELP, gmCommand);
 seal.ext.register(ext);

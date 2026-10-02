@@ -1,7 +1,7 @@
 name: daggerheart-native
 fullName: 匕首之心正式版核心
 authors: [Daggerheart workspace]
-version: 0.2.1
+version: 0.3.0
 templateVer: "2.0"
 updatedTime: "2026-10-02"
 attrs:
@@ -12,13 +12,10 @@ attrs:
     本能: 0
     风度: 0
     知识: 0
-    生命: 0
-    压力: 0
-    护甲: 0
-    希望: 2
-    金币: 0
-    护甲上限: 0
-  defaultsComputed: {}
+  defaultsComputed:
+    希望: "null"
+    压力: "null"
+    恐惧: "null"
   detailOverwrite: {}
 alias:
   敏捷: [agility, agi]
@@ -31,6 +28,7 @@ alias:
   压力: [stress]
   护甲: [armor]
   希望: [hope]
+  恐惧: [fear]
   金币: [gold]
   生命上限: [hpMax]
   压力上限: [stressMax]
@@ -44,6 +42,6 @@ commands:
   sn: {}
   st:
     show:
-      top: [敏捷, 力量, 灵巧, 本能, 风度, 知识, 生命, 压力, 护甲, 希望, 金币]
+      top: [敏捷, 力量, 灵巧, 本能, 风度, 知识, 生命, 压力, 护甲, 希望, 恐惧, 金币]
       sortBy: name
       itemsPerLine: 3

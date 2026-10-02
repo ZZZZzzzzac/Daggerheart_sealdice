@@ -28,6 +28,24 @@ def main():
     version_text=version.stdout.decode('utf-8',errors='replace')
     if version.returncode or '1.6.1' not in version_text: raise RuntimeError('Official 1.6.1 binary required')
     report={'version':version_text.strip(),'steps':[],'commands':[],'runtime':str(runtime)}
+    # Only this isolated runtime contains the second-user inspection helper.
+    scripts=runtime/'data/default/scripts'; scripts.mkdir(parents=True,exist_ok=True)
+    (scripts/'native-smoke-helper.js').write_text("""// ==UserScript==
+// @name native-smoke-helper
+// @author local-test
+// @version 1.0.0
+// ==/UserScript==
+const e=seal.ext.new('native-smoke-helper','local-test','1.0.0');
+const c=seal.ext.newCmdItemInfo();c.name='smokegm';
+c.solve=(ctx,msg,args)=>{
+  const m=seal.newMessage();m.messageType='group';m.groupId=ctx.group.groupId;m.sender.userId='UI:1003';
+  const g=seal.createTempCtx(ctx.endPoint,m);
+  if(args.args[0]==='zero') seal.vars.intSet(g,'恐惧',0);
+  const [value,exists]=seal.vars.intGet(g,'恐惧');
+  seal.replyToSender(ctx,msg,'GM卡恐惧='+value+';存在='+exists);
+  return seal.ext.newCmdExecuteResult(true);
+};e.cmdMap['smokegm']=c;seal.ext.register(e);
+""",encoding='utf-8')
     log=(runtime/'stdout.local.log').open('ab')
     process=None; token=''; url=''
     def call(path,data=None,raw=None,form=None):
@@ -73,44 +91,58 @@ def main():
         step('/package/preview-upload',raw=data); step('/package/install-upload',raw=data)
         step('/package/enable',data={'id':'daggerheart-local/core'}); step('/package/reload',data={'id':'daggerheart-local/core'})
         command('.set dh')
-        command('.dd +2 dc15 -- 独立骰子','掷骰')
-        command('.st 敏捷3 生命上限6 压力上限6 护甲上限2 生命0 压力2 护甲0 希望2 金币0')
-        command('.dh status','希望2/6')
-        command('.dd 敏捷 dc15','手动：')
-        command('.dh gm claim','GM：')
-        command('.dh fear =3','3/12')
-        command('.dd 敏捷 dc15','掷骰')
-        command('.ddr 敏捷 dc15','掷骰')
-        command('.dh 希望 =2','希望')
-        command('.dh 金币 +5','金币0→5')
-        command('.dh fear =12','12/12')
-        command('.dh fear +1','必须是0–12')
+        command('.dd +2 dc15 -- 独立骰子','手动：')
+        command('.st 希望0 压力2 敏捷3')
+        for _ in range(100):
+            result=command('.dd 敏捷 dc15','掷骰')
+            if '关键成功' in result:
+                assert '压力2→1' in result
+                assert '希望' in result and '→' in result
+                assert '手动：希望' not in result
+                break
+        else: raise AssertionError('No critical in 100 real rolls')
+        command('.st show 压力','压力:1')
+        command('.st del 压力')
+        command('.st 希望2')
+        reaction=command('.ddr 敏捷 dc15','掷骰')
+        assert '压力' not in reaction and '→' not in reaction
+        command('.st show 希望','希望:2')
+        command('.dh gm set UI:1003','GM：UI:1003')
+        command('.smokegm zero','GM卡恐惧=0;存在=true')
+        for _ in range(40):
+            result=command('.dd 敏捷','掷骰')
+            if '恐惧0→1' in result: break
+        else: raise AssertionError('No Fear in 40 real rolls')
+        command('.smokegm','GM卡恐惧=1;存在=true')
+        command('.st show 恐惧')
+        command('.dh gm clear','GM已卸任')
+        command('.dh fear +1','用法：')
+        command('.dh 希望 -1','用法：')
+        command('.st 希望2')
         command(".st DH经历='[{\"id\":\"e1\",\"name\":\"测试经历\",\"value\":2}]'")
-        command('.dh experience','测试经历')
-        command('.ddr 敏捷 exp:e1 dc15','+测试经历2')
-        command('.dh status','希望1/6')
-        command('.dh 希望 =0')
+        command('.ddr 敏捷 exp:e1 dc15','希望2→1')
+        command('.st 希望0')
         command('.dd exp:e1','希望不足')
         command('.dd exp2','经历格式')
-        command('.dh 希望 =4')
-        command('.dh 金币 =7')
-        command('.dd junk','无法识别')
+        command('.st 希望4 金币7')
+        command('.dh gm set UI:1003','GM：UI:1003')
         for path in ['/package/disable','/package/reload','/package/enable','/package/reload']: step(path,data={'id':'daggerheart-local/core'})
-        command('.dh status','希望4/6')
+        command('.st show 希望','希望:4')
+        command('.smokegm','GM卡恐惧=1;存在=true')
         if not args.skip_restart:
             print('Waiting for the host 60s attribute persistence tick before restart.',flush=True)
             for _ in range(65): time.sleep(1)
             stop(); start()
-            command('.dh status','希望4/6')
-            command('.dh status','金币7')
-            command('.dh fear','12/12')
-            command('.dh experience','测试经历')
+            command('.st show 希望','希望:4')
+            command('.st show 金币','金币:7')
+            command('.dh gm','GM：UI:1003')
+            command('.smokegm','GM卡恐惧=1;存在=true')
         step('/package/uninstall',data={'id':'daggerheart-local/core','mode':'full'})
         step('/js/reload',data={})
         assert '掷骰' not in command('.dd +2')
         report['passed']=True
         report['persistence_checked']=not args.skip_restart
-        print('PASS native copy smoke, st, resources, GM, experience, reload and uninstall.',flush=True)
+        print('PASS native optional fields, real GM card, st, experiences, reload, restart and uninstall.',flush=True)
     finally:
         stop(); log.close()
         (runtime/'native-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')

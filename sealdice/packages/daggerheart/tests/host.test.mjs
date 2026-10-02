@@ -7,124 +7,107 @@ import { buildSync } from 'esbuild';
 import { unzipSync, strFromU8 } from 'fflate';
 const bundle = buildSync({ entryPoints: [fileURLToPath(new URL('../src/main.mjs', import.meta.url))], bundle: true,
   write: false, platform: 'neutral', format: 'iife', target: 'es2020' }).outputFiles[0].text;
-const complete = { 敏捷: 3, 生命上限: 6, 压力上限: 6, 护甲上限: 2, 生命: 0, 压力: 2, 护甲: 0, 希望: 2, 金币: 0 };
-function host(initial = { 敏捷: 3 }, shared = new Map()) {
-  let extension, rolls = 0, reads = 0, message = 0, failKey = '', user = 'SEALCHAT:PLAYER', group = 'SEALCHAT:ROOM', privilege = 50;
-  const attrs = new Map(Object.entries(initial)), replies = [];
-  const sandbox = { Math: Object.assign(Object.create(Math), { random: () => { rolls++; return 0.1; } }),
-    seal: { ext: { new: () => ({ cmdMap: {}, storageGet: key => shared.get(key) || '', storageSet: (key, value) => shared.set(key, value) }),
-      register: value => { extension = value; }, newCmdItemInfo: () => ({}), newCmdExecuteResult: value => ({ solved: value }) },
-      vars: {
-        intGet: (_ctx, key) => { reads++; return [attrs.get(key) || 0, Number.isInteger(attrs.get(key))]; },
-        strGet: (_ctx, key) => key === '$t游戏模式' ? ['daggerheart-native', true] : [attrs.get(key) || '', typeof attrs.get(key) === 'string'],
-        intSet: (_ctx, key, value) => { if (key === failKey) { failKey = ''; throw new Error('Injected write failure'); } attrs.set(key, value); },
-        strSet: (_ctx, key, value) => attrs.set(key, value),
-      }, replyToSender: (_ctx, _msg, text) => replies.push(text) } };
-  const reload = () => vm.runInNewContext(bundle, sandbox);
-  reload();
-  return { run: (command, args = [], opts = {}) => extension.cmdMap[command].solve({ player: { name: '测试角色', userId: user },
-      group: { groupId: group, system: 'daggerheart-native' }, privilegeLevel: privilege, isPrivate: opts.private || false, endPoint: { userId: 'SEALCHAT:BOT' } },
-      { rawId: opts.noId ? undefined : opts.id || String(++message) }, { args, at: opts.at || [], kwargs: opts.kwargs || [] }),
-    replies, attrs, shared, reload, fail: key => { failKey = key; },
-    context: options => { user = options.user || user; group = options.group || group; privilege = options.privilege ?? privilege; },
-    get rolls() { return rolls; }, get reads() { return reads; } };
+function host(initial = {}, shared = new Map()) {
+  let ext, rolls = 0, id = 0, fail = '', user = 'SEALCHAT:P', group = 'SEALCHAT:ROOM', privilege = 50, dice = [2, 2];
+  const cards = new Map(), replies = [];
+  const attrs = (u = user, g = group) => { const key = `${g}|${u}`; if (!cards.has(key)) cards.set(key, new Map()); return cards.get(key); };
+  for (const [k, v] of Object.entries(initial)) attrs().set(k, v);
+  const context = (u = user, g = group) => ({ player: { userId: u, name: '玩家' }, group: { groupId: g }, endPoint: { userId: 'SEALCHAT:BOT' }, privilegeLevel: privilege });
+  const data = ctx => attrs(ctx.player.userId, ctx.group.groupId);
+  const sandbox = { Math: Object.assign(Object.create(Math), { random: () => { rolls++; return ((dice.shift() ?? 2) - 0.5) / 12; } }),
+    seal: { ext: { new: () => ({ cmdMap: {}, storageGet: k => shared.get(k) || '', storageSet: (k,v) => shared.set(k,v) }),
+      register: v => { ext=v; }, newCmdItemInfo: () => ({}), newCmdExecuteResult: solved => ({ solved }) },
+      vars: { intGet: (c,k) => [data(c).get(k) ?? 0, Number.isInteger(data(c).get(k))],
+        strGet: (c,k) => k === '$t游戏模式' ? ['daggerheart-native', true] : [data(c).get(k) ?? '', typeof data(c).get(k) === 'string'],
+        intSet: (c,k,v) => { if (`${c.player.userId}|${k}` === fail) { fail=''; throw Error('write'); } data(c).set(k,v); },
+        strSet: (c,k,v) => data(c).set(k,v) },
+      newMessage: () => ({ sender: {} }), createTempCtx: (_ep,msg) => context(msg.sender.userId,msg.groupId),
+      replyToSender: (_c,_m,s) => replies.push(s) } };
+  const reload = () => vm.runInNewContext(bundle,sandbox); reload();
+  return { attrs, replies, shared, reload, get rolls() { return rolls; },
+    dice: (...v) => { dice=v; }, context: o => { user=o.user ?? user; group=o.group ?? group; privilege=o.privilege ?? privilege; },
+    fail: (u,k) => { fail=`${u}|${k}`; },
+    run: (name,args=[],opts={}) => ext.cmdMap[name].solve({ ...context(), isPrivate: opts.private ?? false },
+      { rawId: opts.noId ? undefined : opts.id ?? String(++id) }, { args, at: opts.at ?? [], kwargs: [] }) };
 }
-test('plain dd and st-style attributes work without Chat, init or resource state', () => {
-  const h = host();
-  assert.equal(h.run('dd', ['help']).showHelp, true);
-  h.run('dd', ['敏捷', 'junk']); assert.equal(h.rolls, 0);
-  h.run('dd', ['敏捷', 'dc15']); assert.equal(h.rolls, 2);
-  assert.match(h.replies.at(-1), /\+敏捷3/); assert.match(h.replies.at(-1), /手动：/);
-  assert.equal(h.attrs.get('希望'), undefined); assert.equal(h.shared.size, 0);
-  h.attrs.set('敏捷', 4); h.run('ddr', ['敏捷']); assert.match(h.replies.at(-1), /\+敏捷4/);
+test('plain dd needs no resource fields or GM and never creates optional fields', () => {
+  const h=host(); h.run('dd',[]); assert.equal(h.rolls,2); assert.match(h.replies.at(-1),/手动：希望\+1、压力-1/);
+  assert.equal(h.attrs().has('希望'),false); assert.equal(h.attrs().has('压力'),false);
+  h.dice(8,3); h.run('dd',['敏捷']); assert.match(h.replies.at(-1),/敏捷0/);
 });
-test('invalid options and other mentions fail before rolling; bot mention works', () => {
-  const h = host();
-  h.run('dd', [], { at: [{ userId: 'SEALCHAT:OTHER' }] }); assert.equal(h.rolls, 0);
-  assert.match(h.replies.at(-1), /自己的角色/);
-  h.run('dd', [], { kwargs: [{ name: 'evil' }] }); assert.equal(h.rolls, 0);
-  h.run('dd', [], { at: [{ userId: 'SEALCHAT:BOT' }] }); assert.equal(h.rolls, 2);
+test('hope and stress settle independently with no GM, caps or unrelated resources', () => {
+  const hope=host({ 希望:2 }); hope.run('dd',[]); assert.equal(hope.attrs().get('希望'),3); assert.equal(hope.attrs().has('压力'),false);
+  const stress=host({ 压力:2 }); stress.run('dd',[]); assert.equal(stress.attrs().get('压力'),1); assert.equal(stress.attrs().has('希望'),false);
+  const both=host({ 希望:6,压力:0 }); both.run('dd',[]); assert.equal(both.attrs().get('希望'),6); assert.equal(both.attrs().get('压力'),0);
+  both.run('ddr',[]); assert.equal(both.attrs().get('希望'),6); assert.equal(both.attrs().get('压力'),0);
 });
-test('complete st resources auto-settle critical and reaction needs no init', () => {
-  const h = host(complete);
-  h.run('dh', ['gm', 'claim']); h.run('dd', ['敏捷']);
-  assert.equal(h.attrs.get('希望'), 3); assert.equal(h.attrs.get('压力'), 1);
-  assert.match(h.replies.at(-1), /希望2→3/);
-  h.run('ddr', ['敏捷']); assert.equal(h.attrs.get('希望'), 3); assert.equal(h.attrs.get('压力'), 1);
-  h.attrs.set('希望', 6); h.run('dd', []); assert.equal(h.attrs.get('希望'), 6); assert.equal(h.attrs.get('压力'), 0);
+test('GM fear uses GM current card, reflects external st and creates only GM missing fear', () => {
+  const h=host({ 恐惧:8,希望:2 }); h.run('dh',['gm','set','SEALCHAT:G']);
+  h.dice(3,8); h.run('dd',[]); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),1); assert.equal(h.attrs().get('恐惧'),8);
+  h.attrs('SEALCHAT:G').set('恐惧',10); h.dice(3,8); h.run('dd',[]); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),11);
+  h.attrs('SEALCHAT:G').set('恐惧',12); h.dice(3,8); h.run('dd',[]); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),12);
+  h.reload(); h.dice(3,8); h.run('dd',[]); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),12);
+  h.run('dh',['gm','clear']); h.dice(3,8); h.run('dd',[]); assert.match(h.replies.at(-1),/手动：恐惧\+1/);
 });
-test('no GM still allows ordinary roll, without partial settlement', () => {
-  const h = host(complete); h.run('dd', []);
-  assert.equal(h.rolls, 2); assert.equal(h.attrs.get('希望'), 2); assert.equal(h.attrs.get('压力'), 2);
-  assert.match(h.replies.at(-1), /手动：/);
+test('GM can be the roller without separate pools or double updates', () => {
+  const h=host({ 希望:2 }); h.run('dh',['gm','claim']); h.dice(3,8); h.run('dd',[]);
+  assert.equal(h.attrs().get('恐惧'),1); assert.equal(h.attrs().get('希望'),2);
 });
-test('resources use current st values; overflow and invalid card fail without mutation', () => {
-  const h = host(complete); h.run('dh', ['hope', '+1']); assert.equal(h.attrs.get('希望'), 3);
-  h.attrs.set('希望', 5); h.run('dh', ['hope', '-2']); assert.equal(h.attrs.get('希望'), 3);
-  h.run('dh', ['hope', '+9']); assert.equal(h.attrs.get('希望'), 3); assert.match(h.replies.at(-1), /必须是/);
-  h.run('dh', ['gold', '=40']); assert.equal(h.attrs.get('金币'), 40);
-  h.attrs.set('生命', 7); h.run('dh', ['hope', '-1']); assert.equal(h.attrs.get('希望'), 3);
+test('GM designation permissions and group separation, private rolls never use group GM', () => {
+  const h=host({ 希望:2 }); h.context({ privilege:0 }); h.run('dh',['gm','claim']); assert.match(h.replies.at(-1),/群管理/);
+  h.context({ privilege:50 }); h.run('dh',['gm','set','SEALCHAT:G']); h.context({ privilege:0 });
+  h.run('dh',['gm','clear']); assert.match(h.replies.at(-1),/只有GM/);
+  h.context({ user:'SEALCHAT:G' }); h.run('dh',['gm','clear']); assert.match(h.replies.at(-1),/卸任/);
+  h.context({ group:'SEALCHAT:SECOND' }); h.run('dh',['gm']); assert.match(h.replies.at(-1),/未指定/);
+  h.run('dh',['gm','claim'],{private:true}); assert.match(h.replies.at(-1),/群聊/);
 });
-test('GM permissions, handover, cap, channel isolation and persistence', () => {
-  const h = host(); h.context({ privilege: 0 }); h.run('dh', ['gm', 'claim']); assert.match(h.replies.at(-1), /群管理/);
-  h.context({ privilege: 50 }); h.run('dh', ['gm', 'claim']); h.run('dh', ['fear', '=12']);
-  h.run('dh', ['fear', '+1']); assert.match(h.replies.at(-1), /0–12/);
-  h.context({ user: 'SEALCHAT:OTHER', privilege: 0 }); h.run('dh', ['fear', '-1']); assert.match(h.replies.at(-1), /只有当前GM/);
-  h.context({ user: 'SEALCHAT:PLAYER', privilege: 0 }); h.run('dh', ['gm', 'set', 'SEALCHAT:OTHER']);
-  h.run('dh', ['fear', '-1']); assert.match(h.replies.at(-1), /只有当前GM/);
-  h.context({ user: 'SEALCHAT:OTHER' }); h.run('dh', ['fear', '-1']);
-  h.reload(); h.run('dh', ['fear']); assert.match(h.replies.at(-1), /11\/12/);
-  h.context({ group: 'SEALCHAT:SECOND' }); h.run('dh', ['fear']); assert.match(h.replies.at(-1), /0\/12/);
-  h.run('dh', ['fear'], { private: true }); assert.match(h.replies.at(-1), /群聊/);
+test('native st values update the next roll and missing fields stay absent', () => {
+  const h=host({ 希望:2,压力:2 }); h.run('dd',[]); h.attrs().set('希望',4); h.attrs().delete('压力'); h.dice(2,2); h.run('dd',[]);
+  assert.equal(h.attrs().get('希望'),5); assert.equal(h.attrs().has('压力'),false);
+  h.attrs().set('希望',0); h.dice(8,3); h.run('dd',[]); assert.equal(h.attrs().get('希望'),1);
 });
-test('same message ID does not roll or settle twice, including after extension reload', () => {
-  const h = host(complete); h.run('dh', ['gm', 'claim']);
-  h.run('dd', [], { id: 'unique-roll' }); const count = h.rolls;
-  h.reload(); h.run('dd', [], { id: 'unique-roll' });
-  assert.equal(h.rolls, count); assert.equal(h.attrs.get('希望'), 3); assert.equal(h.attrs.get('压力'), 1);
-  assert.match(h.replies.at(-1), /重复消息/);
+test('invalid integers or balances fail before rolling or mutation', () => {
+  for (const value of [-1,7,'bad']) { const h=host({ 希望:value }); h.run('dd',[]); assert.equal(h.rolls,0); }
+  const h=host(); h.run('dh',['gm','set','SEALCHAT:G']); h.attrs('SEALCHAT:G').set('恐惧',13);
+  h.run('dd',[]); assert.equal(h.rolls,0); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),13);
 });
-test('interrupted write freezes group; same owner/card recovery finishes original roll once', () => {
-  const h = host(complete); h.run('dh', ['gm', 'claim']); h.fail('压力'); h.run('dd', [], { id: 'interrupted' });
-  assert.match(h.replies.at(-1), /保存失败/); const count = h.rolls;
-  h.run('dh', ['hope', '-1']); assert.match(h.replies.at(-1), /上次操作未完成/);
-  h.context({ user: 'SEALCHAT:OTHER' }); h.run('dh', ['recover']); assert.match(h.replies.at(-1), /原玩家/);
-  h.context({ user: 'SEALCHAT:PLAYER' }); const role = h.attrs.get('DH角色标识'); h.attrs.set('DH角色标识', 'other-role');
-  h.run('dh', ['recover']); assert.match(h.replies.at(-1), /切回原角色/);
-  h.attrs.set('DH角色标识', role); h.reload(); h.run('dh', ['recover']);
-  assert.equal(h.rolls, count); assert.equal(h.attrs.get('希望'), 3); assert.equal(h.attrs.get('压力'), 1);
-  h.run('dd', [], { id: 'interrupted' }); assert.equal(h.rolls, count);
+test('experiences require only hope, cost before gain, reactions only cost', () => {
+  const h=host({ 希望:2,DH经历:JSON.stringify([{id:'e1',name:'向导',value:2}]) });
+  h.run('dd',['exp:e1']); assert.equal(h.attrs().get('希望'),2);
+  h.run('ddr',['exp:e1']); assert.equal(h.attrs().get('希望'),1);
+  h.attrs().set('希望',0); const rolls=h.rolls; h.run('dd',['exp:e1']); assert.equal(h.rolls,rolls);
+  h.attrs().delete('希望'); h.run('dd',['exp:e1']); assert.equal(h.rolls,rolls);
+  h.run('dd',['exp2']); assert.match(h.replies.at(-1),/经历格式/);
 });
-test('recovery refuses intervening external writes rather than overwriting st', () => {
-  const h = host(complete); h.run('dh', ['gm', 'claim']); h.fail('压力'); h.run('dd', []);
-  h.attrs.set('希望', 0); h.run('dh', ['recover']);
-  assert.match(h.replies.at(-1), /已变动/); assert.equal(h.attrs.get('希望'), 0);
+test('repeat message including reload does not reroll or reapply GM fear', () => {
+  const h=host(); h.run('dh',['gm','set','SEALCHAT:G']); h.dice(3,8); h.run('dd',[],{id:'one'});
+  const rolls=h.rolls; h.reload(); h.run('dd',[],{id:'one'}); assert.equal(h.rolls,rolls); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),1);
 });
-test('experiences come from imported IDs, cost before gains, and missing funds do not roll', () => {
-  const h = host({ ...complete, DH经历: JSON.stringify([{ id: 'e1', name: '山地向导', value: 2 }]) });
-  h.run('dh', ['gm', 'claim']); h.run('dd', ['敏捷', 'exp:e1']);
-  assert.equal(h.attrs.get('希望'), 2); assert.match(h.replies.at(-1), /\+山地向导2/);
-  h.attrs.set('希望', 0); const count = h.rolls; h.run('dd', ['exp:e1']); assert.equal(h.rolls, count);
-  h.run('dd', ['exp:no']); assert.equal(h.rolls, count);
-  h.run('dd', ['exp2']); assert.equal(h.rolls, count); assert.match(h.replies.at(-1), /经历格式/);
-  h.attrs.set('希望', 2); h.run('ddr', ['exp:e1']); assert.equal(h.attrs.get('希望'), 1);
-  h.run('dd', ['exp:e1', 'exp:e1']); assert.match(h.replies.at(-1), /重复选择/);
+test('player partial write recovers same roll, refuses external st conflicts', () => {
+  const h=host({ 希望:2,压力:2 }); h.fail('SEALCHAT:P','压力'); h.run('dd',[],{id:'one'});
+  assert.match(h.replies.at(-1),/保存失败/); const rolls=h.rolls;
+  h.run('dd',[]); assert.match(h.replies.at(-1),/未完成/);
+  h.attrs().set('希望',0); h.run('dh',['recover']); assert.match(h.replies.at(-1),/已变动/);
+  h.attrs().set('希望',3); h.reload(); h.run('dh',['recover']); assert.equal(h.attrs().get('压力'),1); assert.equal(h.rolls,rolls);
 });
-test('invalid persisted state fails closed for mutations but plain dd remains usable', () => {
-  const h = host(); h.shared.set('dh:v1:SEALCHAT:ROOM', '{bad'); h.run('dh', ['fear', '+1']);
-  assert.match(h.replies.at(-1), /状态损坏/); h.run('dd', []); assert.equal(h.rolls, 2);
+test('failed GM write recovery verifies original owner and GM current card', () => {
+  const h=host(); h.run('dh',['gm','set','SEALCHAT:G']); h.fail('SEALCHAT:G','恐惧'); h.dice(3,8); h.run('dd',[]);
+  assert.match(h.replies.at(-1),/保存失败/); const rolls=h.rolls, role=h.attrs('SEALCHAT:G').get('DH角色标识');
+  h.context({user:'SEALCHAT:G'}); h.run('dh',['recover']); assert.match(h.replies.at(-1),/原玩家/);
+  h.context({user:'SEALCHAT:P'}); h.attrs('SEALCHAT:G').set('DH角色标识','other'); h.run('dh',['recover']); assert.match(h.replies.at(-1),/切回原角色/);
+  h.attrs('SEALCHAT:G').set('DH角色标识',role); h.reload(); h.run('dh',['recover']); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),1); assert.equal(h.rolls,rolls);
 });
-test('archive has only native allowlist and declares no elevated capabilities', () => {
-  const zip = unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.2.1.sealpack', import.meta.url)));
-  assert.deepEqual(Object.keys(zip).sort(), ['README.md', 'info.toml', 'scripts/daggerheart.js', 'templates/daggerheart.yaml']);
-  assert.match(strFromU8(zip['info.toml']), /min_version = "1.6.1"/);
-  assert.match(strFromU8(zip['info.toml']), /network = false/);
-  assert.match(strFromU8(zip['templates/daggerheart.yaml']), /templateVer: "2.0"/);
-  new vm.Script(strFromU8(zip['scripts/daggerheart.js']));
+test('removed resource commands cannot mutate attributes or stored pool', () => {
+  const h=host({ 希望:2 }); for (const args of [['hope','-1'],['fear','+1'],['status'],['experience'],['rule']]) h.run('dh',args);
+  assert.equal(h.attrs().get('希望'),2); assert.equal(h.attrs().has('恐惧'),false); assert.equal(h.shared.size,0);
 });
-
-test('native st omitted defaults are read only from this explicit game template', () => {
-  const h = host({ 敏捷: 3, 生命上限: 6, 压力上限: 6 });
-  h.run('dh', ['status']); assert.match(h.replies.at(-1), /生命0\/6/); assert.match(h.replies.at(-1), /希望2\/6/);
-  h.attrs.set('希望', 'bad'); h.run('dh', ['status']); assert.match(h.replies.at(-1), /希望必须/);
+test('invalid options, other mentions and corrupt state fail before rolling', () => {
+  const h=host(); h.run('dd',['junk']); h.run('dd',[],{at:[{userId:'SEALCHAT:G'}]}); assert.equal(h.rolls,0);
+  h.shared.set('dh:v1:SEALCHAT:ROOM','{bad'); h.run('dd',[]); assert.equal(h.rolls,0);
+});
+test('archive includes only native package files and optional fields have no defaults', () => {
+  const zip=unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.3.0.sealpack',import.meta.url)));
+  assert.deepEqual(Object.keys(zip).sort(),['README.md','info.toml','scripts/daggerheart.js','templates/daggerheart.yaml']);
+  const yaml=strFromU8(zip['templates/daggerheart.yaml']); assert.match(yaml,/恐惧: \[fear\]/);
+  assert.doesNotMatch(yaml,/    (希望|压力|恐惧): [0-9]/); assert.match(yaml,/希望: "null"/); new vm.Script(strFromU8(zip['scripts/daggerheart.js']));
 });

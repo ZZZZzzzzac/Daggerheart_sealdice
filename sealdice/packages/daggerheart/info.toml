@@ -2,11 +2,11 @@ format_version = "1.0.0"
 
 [package]
 id = "daggerheart-local/core"
-name = "匕首之心 · 核心与资源"
-version = "0.2.1"
-authors = ["Daggerheart workspace"]
+name = "匕首之心"
+version = "0.3.0"
+authors = ["ZZZZzzzzac"]
 license = "Apache-2.0"
-description = "正式版核心掷骰、玩家动态资源、频道GM恐惧池与可恢复结算。"
+description = "《匕首之心》二元骰插件，从 .dd help 开始使用。"
 
 [package.seal]
 min_version = "1.6.1"
