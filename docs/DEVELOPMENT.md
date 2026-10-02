@@ -12,7 +12,7 @@ npm test 会先构建sealpack，再验证144种基础二元骰组合、难度边
 
 本地测试不等于真实Goja/API或模板加载兼容。上线前用隔离1.6.1完成扩展包预览/安装/启用、脚本和模板重载、.set dh、.dd/.ddr、禁用/重新启用及卸载验收；停用旧同名指令。随后用户明确要求才上传指定包，不整包覆盖运行数据。
 
-0.4.1按希望/压力字段存在与否独立结算；GM恐惧写入指定GM当前群绑定卡，只有GM身份按群保存在扩展。手动资源增减统一.st；公开.dh仅GM操作，recover为维护入口。
+0.4.2按希望/压力字段存在与否独立结算；GM恐惧写入指定GM当前群绑定卡，只有GM身份按群保存在扩展。手动资源增减统一.st；公开.dh仅GM操作，recover为维护入口。
 
 ## SealChat
 
@@ -24,13 +24,13 @@ npm test 会先构建sealpack，再验证144种基础二元骰组合、难度边
 
 reference默认只读，不构建、不安装依赖、不部署；npm run check-reference检查固定快照。包格式与宿主API以对应1.6.1源码核对，在线文档可能领先生产。需要改核心时另外建立development工作副本。
 
-## 0.4.1验收与持久化边界
+## 当前验收与持久化边界
 
 30项测试覆盖二元骰、独立字段、另一个GM用户卡、权限、去重、跨卡失败恢复和旧状态升级。运行python tools/native-smoke.py --binary <官方1.6.1绝对路径>，验收安装、缺失与零值、GM当前卡、手动修正、重载、等待保存周期后重启及卸载。测试helper仅存在唯一忽略runtime，通过真实newMessage/createTempCtx读取第二用户卡，不打包、不接IM或生产。随机骰使用有界循环。
 
 属性约60秒周期保存；意图日志不是人物属性的跨库事务，也不锁住外部.st/character.set。恢复验证原玩家和GM的卡标识与字段前后值。不同群绑定同一GM卡会共享卡上恐惧。
 
-发布目标sealpack-v0.4.1，包及SHA256SUMS与源码提交；不等于生产部署。Chat、PbDH导入、昵称标签及完整术语库待后续。旧0.2.x升级步骤见包README，不隐式迁移旧池，未完成旧写入须先在0.2.1恢复。
+当前豹仓版本为zac/daggerheart@0.4.2，公开下载已核对SHA256，尚未标记verified；不等于生产部署。Chat、PbDH导入、昵称标签及完整术语库待后续。旧0.2.x升级步骤见包README，不隐式迁移旧池，未完成旧写入须先在0.2.1恢复。
 
 ## 原生表达式接口
 
@@ -39,3 +39,16 @@ expression.mjs仅适配ctx.eval与ctx.genDefaultRollVmConfig，复用人物属�
 真实宿主覆盖用户原式、确定性d1对照.r、括号、多属性、自定义字段、别名、修改.st后新值、浮点、数组取高、求和与abs函数、非法尾部及除零。
 
 0.4.1仅调整掷骰显示：单组结果使用[N]，难度显示实际比较符号。用native-smoke.py --skip-restart复验；持久化重启沿用0.4.0验证，不宣称本次重新验收重启。
+
+## 豹仓发布
+
+包ID为zac/daggerheart，显示名为匕首之心；脚本与规则模板ID均为daggerheart，产物为dist/daggerheart-版本.sealpack。0.4.2仅统一包身份和文件名，掷骰规则不变。旧daggerheart-local/core先停用；包身份不同，GM指定和待恢复写入不能假定自动迁移，升级说明见包README。
+
+本地CLI令牌放根目录.env.local的SEALREPO_TOKEN，已被Git忽略；.env.example仅含空字段。发布脚本也接受同名进程环境变量，不在命令参数中传令牌、不输出令牌、不将认证头转发到上传存储。
+
+完成当前版本隔离宿主验收后，运行npm run publish:sealrepo：先构建并跑测试，再按info.toml申请上传、PUT包、提交版本；只操作zac/daggerheart。首次创建已选定的zac命名空间与daggerheart包。同版本存在时停止，上传或提交断线后先在豹仓查看真实状态，再重试，避免重复发布。powershell -NoProfile -NonInteractive -File tools/publish-sealrepo.ps1 -Check仅校验凭据及本地产物。
+
+官方接口依据https://repo.sealdice.com/sealpack/页面的发布实现。豹仓发布、审核和公开可下载是不同状态；上传成功后核对状态并从公开下载校验SHA256。发布不代表生产服务器已安装。
+
+
+0.4.2已完成30项测试及隔离官方1.6.1的安装、启用、掷骰、资源结算、保存周期后的重启和卸载验收。测试使用新的zac/daggerheart包ID，未连接生产或IM。

@@ -12,7 +12,7 @@ async function main() {
   if (!version) throw new Error('Missing package version');
   const compiled = await build({ absWorkingDir: root, entryPoints: [path.join(pkg, 'src/main.mjs')], bundle: true,
     write: false, format: 'iife', platform: 'neutral', target: 'es2020',
-    metafile: true, banner: { js: `// ==UserScript==\n// @name 匕首之心原生核心\n// @author Daggerheart workspace\n// @version ${version}\n// @sealVersion 1.6.1\n// @license Apache-2.0\n// ==/UserScript==` } });
+    metafile: true, banner: { js: `// ==UserScript==\n// @name 匕首之心\n// @author Daggerheart workspace\n// @version ${version}\n// @sealVersion 1.6.1\n// @license Apache-2.0\n// ==/UserScript==` } });
   for (const input of Object.keys(compiled.metafile.inputs)) {
     const absolute = path.resolve(root, input);
     if (!absolute.startsWith(path.join(pkg, 'src') + path.sep)) throw new Error(`Unexpected source dependency: ${input}`);
@@ -28,7 +28,7 @@ async function main() {
   };
   const dist = path.join(pkg, 'dist');
   fs.mkdirSync(dist, { recursive: true });
-  const output = path.join(dist, `daggerheart-core-${version}.sealpack`);
+  const output = path.join(dist, `daggerheart-${version}.sealpack`);
   fs.writeFileSync(output, zipSync(files, { level: 6 }));
   fs.writeFileSync(path.join(dist, 'daggerheart.js'), js);
   console.log(`Built ${output} (${fs.statSync(output).size} bytes)`);

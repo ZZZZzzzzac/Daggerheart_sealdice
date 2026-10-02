@@ -16,7 +16,8 @@ def main():
     package_root=root/'sealdice/packages/daggerheart'
     version_line=next(line for line in (package_root/'info.toml').read_text(encoding='utf-8').splitlines() if line.startswith('version = '))
     package_version=version_line.split('\"')[1]
-    package=package_root/'dist'/f'daggerheart-core-{package_version}.sealpack'
+    package=package_root/'dist'/f'daggerheart-{package_version}.sealpack'
+    package_id=next(line for line in (package_root/'info.toml').read_text(encoding='utf-8').splitlines() if line.startswith('id = ')).split(chr(34))[1]
     runtime=package_root/'runtime'/('smoke-'+uuid.uuid4().hex)
     runtime.mkdir(parents=True)
     (runtime/'.owned-smoke-runtime').write_text('Isolated local validation only',encoding='utf-8')
@@ -89,7 +90,7 @@ c.solve=(ctx,msg,args)=>{
         start()
         data=package.read_bytes()
         step('/package/preview-upload',raw=data); step('/package/install-upload',raw=data)
-        step('/package/enable',data={'id':'daggerheart-local/core'}); step('/package/reload',data={'id':'daggerheart-local/core'})
+        step('/package/enable',data={'id':package_id}); step('/package/reload',data={'id':package_id})
         command('.set dh')
         command('.dd +2 dc15 -- 独立骰子','手动：')
         command('.st 敏捷3 力量1 自定义加值4')
@@ -142,7 +143,7 @@ c.solve=(ctx,msg,args)=>{
         command('.st show 希望','希望:1')
         command('.st 希望4 金币7')
         command('.dh gm set UI:1003','GM：UI:1003')
-        for path in ['/package/disable','/package/reload','/package/enable','/package/reload']: step(path,data={'id':'daggerheart-local/core'})
+        for path in ['/package/disable','/package/reload','/package/enable','/package/reload']: step(path,data={'id':package_id})
         command('.st show 希望','希望:4')
         command('.smokegm','GM卡恐惧=1;存在=true')
         if not args.skip_restart:
@@ -153,7 +154,7 @@ c.solve=(ctx,msg,args)=>{
             command('.st show 金币','金币:7')
             command('.dh gm','GM：UI:1003')
             command('.smokegm','GM卡恐惧=1;存在=true')
-        step('/package/uninstall',data={'id':'daggerheart-local/core','mode':'full'})
+        step('/package/uninstall',data={'id':package_id,'mode':'full'})
         step('/js/reload',data={})
         assert '掷骰' not in command('.dd +2')
         report['passed']=True

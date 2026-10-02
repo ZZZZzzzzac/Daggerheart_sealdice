@@ -22,7 +22,7 @@
 
 ## P1：sealpack核心（当前）
 
-目录 sealdice/packages/daggerheart。功能：.dd/.ddr、数字/额外骰修正、六特质、来源抵消后的单枚优劣势骰、显式DC和原因、数字修正与资源结算提示。固定d12二元骰，关键成功优先于难度；未给DC不编造成功/失败。0.4.1使用原生.st作为属性/资源入口，无.dh init门槛；希望/压力字段存在时独立结算；指定GM时恐惧写入GM当前绑定卡。资源增减统一.st，.dh公开入口仅GM操作，数字修正不自动扣希望，费用由玩家手动.st处理，尚无.pbcha导入。
+目录 sealdice/packages/daggerheart。功能：.dd/.ddr、数字/额外骰修正、六特质、来源抵消后的单枚优劣势骰、显式DC和原因、数字修正与资源结算提示。固定d12二元骰，关键成功优先于难度；未给DC不编造成功/失败。0.4.2使用原生.st作为属性/资源入口，无.dh init门槛；希望/压力字段存在时独立结算；指定GM时恐惧写入GM当前绑定卡。资源增减统一.st，.dh公开入口仅GM操作，数字修正不自动扣希望，费用由玩家手动.st处理，尚无.pbcha导入。
 
 P1基础包已在隔离官方Windows 1.6.1实例完成安装、启用、.set dh、真实Goja的.dd/.ddr与特质读取、禁用/启用重载和卸载验收；30项本地测试通过。没有连接生产或IM账号，尚未验证Chat联动。运行实例中存在旧同名指令时先停用旧包。
 
@@ -46,4 +46,4 @@ P1基础包已在隔离官方Windows 1.6.1实例完成安装、启用、.set dh�
 - [sealpack说明](https://docs.sealdice.com/config/package.html)；包清单与模板接口以固定reference/sealdice-core为准。
 - reference/sealchat/doc/character-sheet-template-development.md 与 channel-embed-api-developer-guide.md。
 
-旧插件已从工作目录移除，原实现由Git历史保留；新构建仅引用sealpack源码。当前完成Dice侧0.4.1代码与本地测试，真实宿主验收结果见开发说明；P2/P3/P4尚未实现，不宣称全部需求已交付。
+旧插件已从工作目录移除，原实现由Git历史保留；新构建仅引用sealpack源码。当前完成Dice侧0.4.2代码与本地测试，真实宿主验收结果见开发说明；P2/P3/P4尚未实现，不宣称全部需求已交付。

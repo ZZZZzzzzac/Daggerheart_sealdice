@@ -1,5 +1,5 @@
 {
-  "name": "daggerheart-seal-development",
+  "name": "daggerheart",
   "version": "1.0.0",
   "private": true,
   "description": "Local SealDice plugins and SealChat development workspace",
@@ -10,7 +10,8 @@
   "scripts": {
     "build": "node tools/build-sealpack.cjs",
     "test": "node tools/build-sealpack.cjs && node --test sealdice/packages/daggerheart/tests/*.test.mjs",
-    "check-reference": "node tools/check-reference.cjs"
+    "check-reference": "node tools/check-reference.cjs",
+    "publish:sealrepo": "npm test && powershell -NoProfile -NonInteractive -File tools/publish-sealrepo.ps1"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
