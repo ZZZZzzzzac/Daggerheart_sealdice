@@ -2,7 +2,7 @@ import { parseRequest, rollRequest, formatRoll, formatSettlement } from './rules
 import { evaluateNative } from './expression.mjs';
 import { bounded, settleOptional, parseGroupState } from './state.mjs';
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 const HELP = `.dd [算式] [adv/dis] [dc难度] [-- 原因]
 例：.dd 敏捷+2+2d6k1 adv dc15 -- 攀爬
 .ddr：反应掷骰；.st：属性与资源；.dh gm：指定GM。`;

@@ -1,4 +1,4 @@
-# 匕首之心 sealpack · 0.4.0
+# 匕首之心 sealpack · 0.4.1
 
 属性与资源统一用原生 .st；无需 Chat、.dh init、完整资源或静态上限。
 
@@ -58,6 +58,8 @@
 
 src/rules.mjs包含规则和掷骰/结算文案；src/main.mjs包含帮助、GM命令、人物卡读写及恢复；src/state.mjs包含独立字段结算；templates/daggerheart.yaml包含模板及.st展示。npm test / npm run build生成dist，不直接修改产物。
 
-29项测试；tools/native-smoke.py用隔离官方1.6.1验收缺失/零值字段、另一个用户的GM卡、手动数字修正、重载、重启及卸载，不接IM或生产。没有网络/HTTP/文件读写权限。Chat人物卡、PbDH导入、昵称标签与完整术语库尚未实现。
+30项测试；tools/native-smoke.py用隔离官方1.6.1验收缺失/零值字段、另一个用户的GM卡、手动数字修正、重载、重启及卸载，不接IM或生产。没有网络/HTTP/文件读写权限。Chat人物卡、PbDH导入、昵称标签与完整术语库尚未实现。
 
 规则依据：官方SRD 2.0核心 https://www.daggerheart.com/srd/ 。
+
+结果示例：希望[12]+恐惧[7]+(+2+4d6)[14]=33 > 难度19。优势/劣势也用[N]显示出目；相等显示=，小于显示<，关键成功仍按二元骰相同出目判断。

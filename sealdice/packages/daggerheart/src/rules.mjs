@@ -67,11 +67,11 @@ export function formatRoll(result, name, hints = true) {
   const outcome = critical ? '关键成功' : request.reaction
     ? (success === null ? '待定' : success ? '成功' : '失败')
     : `${withHope ? '希望' : '恐惧'}${success === null ? '' : success ? '成功' : '失败'}`;
-  let expression = `希望${hope}+恐惧${fear}`;
+  let expression = `希望[${hope}]+恐惧[${fear}]`;
   if (request.expression) expression += `+(${result.expression})[${modifier}]`;
-  if (advantage) expression += `${advantage > 0 ? '+' : '-'}${advantage > 0 ? '优势' : '劣势'}${Math.abs(advantage)}`;
+  if (advantage) expression += `${advantage > 0 ? '+' : '-'}${advantage > 0 ? '优势' : '劣势'}[${Math.abs(advantage)}]`;
   const lines = [`【${name}】${request.reaction ? '反应掷骰' : '掷骰'} · ${outcome}${request.reason ? ` · ${request.reason}` : ''}`,
-    `${expression}=${total}${request.difficulty !== null ? ` / 难度${request.difficulty}` : ''}`];
+    `${expression}=${total}${request.difficulty !== null ? ` ${total > request.difficulty ? '>' : total < request.difficulty ? '<' : '='} 难度${request.difficulty}` : ''}`];
   if (hints) {
     const resources = [];
     if (effects.hopeGain) resources.push('希望+1');

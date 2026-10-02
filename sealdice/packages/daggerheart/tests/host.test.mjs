@@ -109,7 +109,7 @@ test('invalid options, other mentions and corrupt state fail before rolling', ()
   h.shared.set('dh:v1:SEALCHAT:ROOM','{bad'); h.run('dd',[]); assert.equal(h.rolls,0);
 });
 test('archive includes only native package files and optional fields have no defaults', () => {
-  const zip=unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.4.0.sealpack',import.meta.url)));
+  const zip=unzipSync(readFileSync(new URL('../dist/daggerheart-core-0.4.1.sealpack',import.meta.url)));
   assert.deepEqual(Object.keys(zip).sort(),['README.md','info.toml','scripts/daggerheart.js','templates/daggerheart.yaml']);
   const yaml=strFromU8(zip['templates/daggerheart.yaml']); assert.match(yaml,/恐惧: \[fear\]/);
   assert.doesNotMatch(yaml,/    (希望|压力|恐惧): [0-9]/); assert.match(yaml,/希望: "null"/); new vm.Script(strFromU8(zip['scripts/daggerheart.js']));
