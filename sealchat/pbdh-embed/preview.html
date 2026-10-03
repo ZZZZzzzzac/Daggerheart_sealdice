@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PbDH · SealChat 隔离协议预览</title>
+<style>body{margin:0;font-family:system-ui,sans-serif;background:#f4f4f2;color:#202020}header{padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}header p{margin:0;width:100%}button{padding:6px 10px}iframe{width:100%;height:calc(100vh - 180px);border:0;background:white}pre{margin:0;padding:8px 12px;font-size:12px;max-height:70px;overflow:auto}</style></head>
+<body><header><strong>隔离协议预览 · 官方 SDK + 模拟宿主</strong><p>本页不连接 SealChat、SealDice、生产账号或群聊；消息仅保存在当前预览内存中。</p>
+<button id="external">模拟外部希望 +1</button><button id="roll">模拟检定结算</button><button id="switch">模拟切卡</button><button id="offline">模拟断线 / 恢复</button><button id="close">模拟会话失效</button>
+<span id="summary"></span></header><pre id="messages">尚未发送指令</pre>
+<iframe id="player" title="PbDH 实验人物卡" sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups" referrerpolicy="no-referrer"></iframe>
+<script>
+const frame = document.getElementById('player');
+const playerUrl = new URL('__PLAYER_URL__');
+playerUrl.searchParams.set('sealchat', '1');
+playerUrl.searchParams.set('hostOrigin', location.origin);
+playerUrl.searchParams.set('sdkUrl', location.origin + '/api/v1/channel-embed-sdk.js');
+const sessions = new Map();
+const seenNonces = new Set();
+const capabilities = ['context.read', 'characterCard.read', 'messages.send'];
+let contextVersion = 1, active = 0, connected = true;
+const cards = [
+  { name: '隔离角色 A', sheetType: 'daggerheart', attrs: { 生命: 0, 生命上限: 6, 压力: 2, 压力上限: 6, 护甲: 0, 护甲上限: 3, 希望: 2, 希望上限: 6 } },
+  { name: '隔离角色 B', sheetType: 'daggerheart', attrs: { 生命: 1, 生命上限: 6, 压力: 0, 压力上限: 6, 护甲: 1, 护甲上限: 3, 希望: 5, 希望上限: 6 } },
+];
+const sent = [];
+function context() { return { world: { id: 'preview-world' }, channel: { id: 'preview-channel' }, currentUser: { id: 'preview-user' }, currentCharacter: { id: 'preview-identity-' + active, name: cards[active].name }, connection: { state: connected ? 'connected' : 'offline' }, permissions: { canSendMessage: connected }, capabilities, contextVersion }; }
+function render() { document.getElementById('summary').textContent = cards[active].name + ' · 希望 ' + cards[active].attrs.希望 + ' · ' + (connected ? '已连接' : '断线'); document.getElementById('messages').textContent = sent.length ? sent.join('\n') : '尚未发送指令'; }
+function event(topic, payload) { for (const [sessionId, port] of sessions) port.postMessage({ type: 'sealchat.embed.event', version: 1, sessionId, contextVersion, eventId: crypto.randomUUID(), topic, payload, at: Date.now() }); }
+function companionEvents() { contextVersion++; event('context.changed', context()); event('connection.changed', context().connection); render(); }
+window.addEventListener('message', e => {
+  if (e.source !== frame.contentWindow || e.origin !== playerUrl.origin || e.data?.type !== 'sealchat.embed.handshake' || seenNonces.has(e.data.nonce)) return;
+  seenNonces.add(e.data.nonce);
+  const channel = new MessageChannel(), sessionId = crypto.randomUUID();
+  sessions.set(sessionId, channel.port1);
+  channel.port1.onmessage = message => {
+    const req = message.data;
+    if (req.type !== 'sealchat.embed.request' || req.sessionId !== sessionId) return;
+    if (req.method === 'session.close') { sessions.delete(sessionId); channel.port1.close(); return; }
+    let result, error;
+    try {
+      if (req.method === 'context.get') result = context();
+      else if (req.method === 'connection.getState') result = context().connection;
+      else if (req.method === 'characterCard.getCurrent') result = { status: { available: connected }, card: connected ? structuredClone(cards[active]) : null };
+      else if (req.method === 'messages.send') {
+        if (!connected || req.params.identityId !== context().currentCharacter.id) throw Error('PERMISSION_DENIED');
+        const match = /^\.st (生命|压力|护甲|希望)([+-])1$/.exec(req.params.text);
+        if (!match) throw Error('INVALID_PARAMS');
+        const key = match[1], delta = match[2] === '+' ? 1 : -1;
+        cards[active].attrs[key] += delta;
+        sent.push(req.params.text); render(); result = { id: crypto.randomUUID() };
+      } else throw Error('CAPABILITY_DENIED');
+    } catch (e) { error = { code: e.message, message: e.message }; }
+    channel.port1.postMessage({ type: 'sealchat.embed.response', version: 1, sessionId, requestId: req.requestId, ok: !error, result, error });
+  };
+  channel.port1.start();
+  e.source.postMessage({ type: 'sealchat.embed.handshake.ack', version: 1, nonce: e.data.nonce, ok: true, sessionId, contextVersion, capabilities }, e.origin, [channel.port2]);
+});
+document.getElementById('external').onclick = () => { cards[active].attrs.希望 = Math.min(6, cards[active].attrs.希望 + 1); render(); };
+document.getElementById('roll').onclick = () => { cards[active].attrs.希望 = Math.min(6, cards[active].attrs.希望 + 1); cards[active].attrs.压力 = 0; render(); };
+document.getElementById('switch').onclick = () => { active = 1 - active; companionEvents(); };
+document.getElementById('offline').onclick = () => { connected = !connected; companionEvents(); };
+document.getElementById('close').onclick = () => { event('session.closed', {}); sessions.clear(); };
+render(); frame.src = playerUrl.href;
+</script></body></html>

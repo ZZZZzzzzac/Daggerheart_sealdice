@@ -11,7 +11,10 @@
     "build": "node tools/build-sealpack.cjs",
     "test": "node tools/build-sealpack.cjs && node --test sealdice/packages/daggerheart/tests/*.test.mjs",
     "check-reference": "node tools/check-reference.cjs",
-    "publish:sealrepo": "npm test && powershell -NoProfile -NonInteractive -File tools/publish-sealrepo.ps1"
+    "publish:sealrepo": "npm test && powershell -NoProfile -NonInteractive -File tools/publish-sealrepo.ps1",
+    "build:pbdh-embed": "node tools/build-pbdh-embed.mjs",
+    "test:pbdh-embed": "node --test sealchat/pbdh-embed/config.test.mjs",
+    "preview:pbdh-embed": "node tools/preview-pbdh-embed.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
