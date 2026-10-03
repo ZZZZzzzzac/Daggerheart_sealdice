@@ -11,6 +11,11 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--binary',required=True)
     parser.add_argument('--skip-restart',action='store_true',help='Skip previously verified persistence check for copy-only patches')
+    parser.add_argument('--zero-resources-only',action='store_true',help='Check native st storage, zero-value labels and resource persistence on a bound card')
+    parser.add_argument('--experiences-only',action='store_true',help='Check bounded experience import, native rolls, Hope costs and restart persistence')
+    parser.add_argument('--st-export-fixture',help='Synthetic fixture from the real PbDH formatter: command and experiences')
+    parser.add_argument('--summary-gold-only',action='store_true',help='Check st show whitelist and separate native gold quantities')
+    parser.add_argument('--restart-before-enable',action='store_true',help='Verify re-enable after host restart when Windows retains cache-directory handles')
     args=parser.parse_args()
     root=Path(__file__).resolve().parent.parent
     package_root=root/'sealdice/packages/daggerheart'
@@ -46,6 +51,19 @@ c.solve=(ctx,msg,args)=>{
   seal.replyToSender(ctx,msg,'GM卡恐惧='+value+';存在='+exists);
   return seal.ext.newCmdExecuteResult(true);
 };e.cmdMap['smokegm']=c;seal.ext.register(e);
+const resources=seal.ext.newCmdItemInfo();resources.name='smokeresources';
+resources.solve=(ctx,msg)=>{
+  const fields=['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','金币','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值'];
+  const values={};for(const field of fields) values[field]=seal.vars.intGet(ctx,field);
+  seal.replyToSender(ctx,msg,'RESOURCES='+JSON.stringify(values)+';LABEL='+seal.format(ctx,'生命{生命}/{生命上限}|护甲{护甲}/{护甲上限}'));
+  return seal.ext.newCmdExecuteResult(true);
+};e.cmdMap['smokeresources']=resources;
+const experiences=seal.ext.newCmdItemInfo();experiences.name='smokeexperiences';
+experiences.solve=(ctx,msg)=>{
+  const [stored,exists]=seal.vars.strGet(ctx,'DH经历');
+  seal.replyToSender(ctx,msg,'EXPERIENCES='+JSON.stringify({stored,exists,hope:seal.vars.intGet(ctx,'希望')[0],stress:seal.vars.intGet(ctx,'压力')[0]}));
+  return seal.ext.newCmdExecuteResult(true);
+};e.cmdMap['smokeexperiences']=experiences;
 """,encoding='utf-8')
     log=(runtime/'stdout.local.log').open('ab')
     process=None; token=''; url=''
@@ -58,7 +76,7 @@ c.solve=(ctx,msg,args)=>{
         with urllib.request.urlopen(urllib.request.Request(url+path,data=body,headers=headers),timeout=20) as res:
             raw_data=res.read(); result=json.loads(raw_data) if raw_data else None
         if isinstance(result,dict) and (result.get('result') is False or result.get('data',{}).get('success') is False):
-            raise RuntimeError('Local API reported failure: '+path)
+            raise RuntimeError('Local API reported failure: '+path+'; '+json.dumps(result,ensure_ascii=False))
         return result
     def start():
         nonlocal process,token,url
@@ -92,6 +110,115 @@ c.solve=(ctx,msg,args)=>{
         step('/package/preview-upload',raw=data); step('/package/install-upload',raw=data)
         step('/package/enable',data={'id':package_id}); step('/package/reload',data={'id':package_id})
         command('.set dh')
+        if args.summary_gold_only:
+            command('.pc new smoke-gold')
+            command('.st 敏捷=0 生命=0 生命上限=5 护甲=0 护甲上限=4 希望=2 金币把=0 金币袋=9 金币箱=1 恐惧=7 DH角色标识="keep-recovery-role" 任意私密字段=99')
+            output=command('.st show','金币把:0')
+            for text in ['敏捷:0','生命:0','护甲:0','金币袋:9','金币箱:1','恐惧:7']: assert text in output,output
+            for text in ['DH角色标识','keep-recovery-role','任意私密字段','99']: assert text not in output,output
+            output=command('.st show DH角色标识')
+            assert 'keep-recovery-role' not in output and 'DH角色标识' not in output,output
+            command('.st show agi 把','敏捷:0')
+            command('.st 把+1 袋+1 箱-1')
+            command('.st list','金币袋:10')
+            command('.st show 金币把 金币箱','金币箱:0')
+            command('.st export','keep-recovery-role')
+            step('/package/reload',data={'id':package_id})
+            command('.st show','金币把:1')
+            if not args.skip_restart:
+                print('Waiting for native attribute persistence before restart.',flush=True)
+                for _ in range(65): time.sleep(1)
+                stop();start();command('.st show','金币把:1')
+            report['passed']=True;report['persistence_checked']=not args.skip_restart
+            return
+        if args.experiences_only:
+            command('.pc new smoke-experiences')
+            command('.st 敏捷1 希望3 压力2 生命0 生命上限5 护甲0 护甲上限4')
+            fixture=json.loads(Path(args.st_export_fixture).read_text(encoding='utf-8')) if args.st_export_fixture else None
+            items=fixture['experiences'] if fixture else [{'name':'向导 "甲" O\'Brien \\ {敏捷} ＋－＝：＆＊ </body> 🐈','modifier':2},{'name':'守望者','modifier':3}]
+            def encoded(items):
+                return json.dumps({'schemaVersion':1,'experiences':items},ensure_ascii=False,separators=(',',':'))
+            def selection(items, indices):
+                h=5381
+                units=encoded(items).encode('utf-16-le')
+                for offset in range(0,len(units),2): h=((h*33)^int.from_bytes(units[offset:offset+2],'little'))&0xffffffff
+                return 'exp='+','.join(map(str,indices))+'@'+format(h,'08x')
+            def install(items):
+                literal=json.dumps({'schemaVersion':1,'experiences':items},ensure_ascii=True,separators=(',',':'))
+                command('.st DH经历='+json.dumps(literal,ensure_ascii=False))
+            def inspect(items,hope):
+                output=command('.smokeexperiences')
+                data=json.loads(output.split('EXPERIENCES=',1)[1])
+                assert data['exists'] and json.loads(data['stored'])==json.loads(encoded(items)),data
+                assert data['hope']==hope,data
+            if fixture:
+                assert fixture['command'].startswith('.st ') and '\n' not in fixture['command']
+                command(fixture['command'])
+            else: install(items)
+            inspect(items,3)
+            assert 'DH经历' not in command('.st show')
+            experience_selection=selection(items,[1,2])
+            result=command('.ddr 敏捷 '+experience_selection,'希望消耗2')
+            assert '[6]' in result and '希望3→1' in result,result
+            inspect(items,1)
+            command('.ddr 敏捷 '+experience_selection,'希望不足');inspect(items,1)
+            command('.st 希望2')
+            command('.ddr 1/0 '+experience_selection,'算式无效');inspect(items,2)
+            install([]);inspect([],2)
+            install(items);inspect(items,2)
+            changed=[{'name':'新经历','modifier':9}];install(changed)
+            command('.ddr 敏捷 '+experience_selection,'经历已变化');inspect(changed,2)
+            zero=[{'name':'零值经历','modifier':0}];install(zero)
+            command('.st 希望1');command('.ddr 敏捷 '+selection(zero,[1]),'希望1→0');inspect(zero,0)
+            command('.ddr 敏捷 '+selection(zero,[1]),'希望不足');inspect(zero,0)
+            install(items);command('.st 希望4')
+            step('/package/reload',data={'id':package_id});inspect(items,4)
+            command('.st 希望-1');inspect(items,3)
+            if not args.skip_restart:
+                print('Waiting for the host 60s attribute persistence tick before restart.',flush=True)
+                for _ in range(65): time.sleep(1)
+                stop();start();inspect(items,3)
+                command('.ddr 敏捷 '+selection(items,[1]),'希望3→2');inspect(items,2)
+            report['passed']=True
+            report['persistence_checked']=not args.skip_restart
+            print('PASS native experience strings, UTF-8, costs, stale selection, reload and persistence.',flush=True)
+            return
+        if args.zero_resources_only:
+            fields=['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','金币','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值']
+            def inspect(values):
+                output=command('.smokeresources')
+                for field in fields:
+                    expected=json.dumps(field,ensure_ascii=False)+':'+json.dumps([values.get(field,0),field in values],separators=(',',':'))
+                    assert expected in output, f'Missing raw stored value: {expected}; output={output!r}'
+                if '生命' in values and '护甲' in values:
+                    label=f"LABEL=生命{values['生命']}/{values['生命上限']}|护甲{values['护甲']}/{values['护甲上限']}"
+                    assert label in output, f'Zero value omitted from label: {output!r}'
+            command('.pc new smoke-zero')
+            inspect({})
+            values={field:0 for field in fields}
+            values.update({'生命上限':5,'压力上限':7,'护甲上限':4,'希望上限':6})
+            command('.st '+' '.join(f'{field}{value}' for field,value in values.items()))
+            inspect(values)
+            command('.ddr 力量','[0]')
+            command('.st format')
+            inspect(values)
+            command('.st hp+1 armor+1')
+            values.update({'生命':1,'护甲':1}); inspect(values)
+            command('.st hp-1 armor-1')
+            values.update({'生命':0,'护甲':0}); inspect(values)
+            command('.st del 生命'); command('.st del 护甲')
+            del values['生命']; del values['护甲']; inspect(values)
+            command('.st hp0 armor0')
+            values.update({'生命':0,'护甲':0}); inspect(values)
+            step('/package/reload',data={'id':package_id}); inspect(values)
+            if not args.skip_restart:
+                print('Waiting for the host 60s attribute persistence tick before restart.',flush=True)
+                for _ in range(65): time.sleep(1)
+                stop(); start(); inspect(values)
+            report['passed']=True
+            report['persistence_checked']=not args.skip_restart
+            print('PASS bound-card zero resources, native labels, aliases, format, delete, reload and persistence.',flush=True)
+            return
         command('.dd +2 dc15 -- 独立骰子','手动：')
         command('.st 敏捷3 力量1 自定义加值4')
         command('.dd 敏捷+2+1d6-4+2d6k1-3d12l1','掷骰')
@@ -141,9 +268,14 @@ c.solve=(ctx,msg,args)=>{
         command('.dd exp:e1','算式无效')
         command('.st 希望-1')
         command('.st show 希望','希望:1')
-        command('.st 希望4 金币7')
+        command('.st 希望4 金币把7')
         command('.dh gm set UI:1003','GM：UI:1003')
-        for path in ['/package/disable','/package/reload','/package/enable','/package/reload']: step(path,data={'id':package_id})
+        for path in ['/package/disable','/package/reload','/package/enable','/package/reload']:
+            if path == '/package/enable' and args.restart_before_enable:
+                print('Restarting the isolated host before re-enable (Windows cache rename workaround).',flush=True)
+                stop(); start()
+                report['steps'].append('restart-before-enable')
+            step(path,data={'id':package_id})
         command('.st show 希望','希望:4')
         command('.smokegm','GM卡恐惧=1;存在=true')
         if not args.skip_restart:
@@ -151,7 +283,7 @@ c.solve=(ctx,msg,args)=>{
             for _ in range(65): time.sleep(1)
             stop(); start()
             command('.st show 希望','希望:4')
-            command('.st show 金币','金币:7')
+            command('.st show 金币把','金币把:7')
             command('.dh gm','GM：UI:1003')
             command('.smokegm','GM卡恐惧=1;存在=true')
         step('/package/uninstall',data={'id':package_id,'mode':'full'})

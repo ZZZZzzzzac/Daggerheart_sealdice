@@ -1,0 +1,35 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>人物卡接口预览</title><style>
+body{margin:0;background:#0e1117;color:#c9d1d9;font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}main{max-width:1120px;margin:20px auto;padding:0 16px}h1{font-size:18px}p{color:#8b949e}nav{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}button{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:7px 10px;cursor:pointer}.layout{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:20px}iframe{width:100%;height:1080px;border:1px solid #30363d;border-radius:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #30363d;padding:12px;min-height:100px}label{display:block;margin:12px 0}input[type=range]{width:100%}@media(max-width:850px){.layout{grid-template-columns:1fr}}
+</style></head><body><main><h1>匕首之心人物卡 · 官方接口本地预览</h1><p>默认模拟原生人物卡协议，可选模拟嵌入窗 SDK；只记录指令，不连接 Chat、Dice 或群聊。</p><nav><button data-scenario="rich">可选嵌入窗</button><button data-scenario="missing">缺失数据</button><button data-scenario="readonly">无发送权限</button><button data-scenario="unbound">未绑定人物卡</button><button data-scenario="switch">切换角色</button><button data-scenario="updated">更新资源</button><button id="native">原生人物卡（默认）</button><button id="old">旧版 UI 参考</button></nav><div class="layout"><div><iframe id="sheet" sandbox="allow-scripts" title="匕首之心人物卡"></iframe></div><aside><label>窗口宽度 <output id="width-label">540</output> px<input id="width" type="range" min="300" max="560" value="540"></label><h2>发送记录</h2><pre id="log" role="status">尚无请求</pre><p>发送成功只表示消息请求返回，数值仍以 Dice 回复和后续读取为准。</p></aside></div></main><script type="module">
+import { fixture } from './fixture.mjs';
+const frame=document.getElementById('sheet'), log=document.getElementById('log');
+const html=await (await fetch('/daggerheart.html')).text();
+const embedHtml=await(await fetch('/daggerheart-embed.html')).text();
+// Execute the fixed snapshot's actual injection code; preview only, never bundled.
+const hostHooks=await(await fetch('/host-hooks.json')).json();
+const hookNames=Object.keys(hostHooks.constants);
+const hostInject=new Function('props','hasTemplateFonts',...hookNames,hostHooks.body);
+const withHostHooks=html=>hostInject({html},{value:false},...hookNames.map(name=>hostHooks.constants[name]));
+const config='<script>window.__SEALCHAT_EMBED_CONFIG__='+JSON.stringify({hostOrigin:location.origin,sdkUrl:location.origin+'/mock-sdk.js'})+';<\/script>';
+const nativeHtml=html;
+let mode='native', current=structuredClone(fixture);
+frame.addEventListener('load',()=>{if(mode==='native')frame.contentWindow.postMessage({type:'SEALCHAT_UPDATE',payload:current},'*');});
+function embed(){mode='embed';frame.srcdoc=embedHtml.replace('<script>',config+'<script>');}
+function native(){mode='native';current=structuredClone(fixture);frame.srcdoc=withHostHooks(nativeHtml);}
+native();
+const zeroButton=document.createElement('button');zeroButton.textContent='全部零值';document.querySelector('nav').append(zeroButton);
+zeroButton.addEventListener('click',()=>{
+  mode='native';current=structuredClone(fixture);
+  current.attrs=Object.fromEntries(['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','闪避','重伤阈值','严重阈值','金币把','金币袋','金币箱','恐惧'].map(key=>[key,0]));
+  Object.assign(current.attrs,{'生命上限':5,'压力上限':7,'护甲上限':4,'希望上限':6});
+  current.attrs.DH经历=JSON.stringify({schemaVersion:1,experiences:[{name:'零值经历',modifier:0}]});
+  frame.srcdoc=withHostHooks(nativeHtml);
+});
+const reopenButton=document.createElement('button');reopenButton.textContent='重开人物卡';document.querySelector('nav').append(reopenButton);
+reopenButton.addEventListener('click',()=>{mode='native';frame.srcdoc=withHostHooks(nativeHtml);});
+window.addEventListener('message',event=>{if(event.source!==frame.contentWindow)return;if(event.data?.type==='DH_PREVIEW_COMMAND')log.textContent=JSON.stringify(event.data.payload,null,2);if(event.data?.type==='SEALCHAT_EVENT')log.textContent=JSON.stringify(event.data,null,2);});
+document.querySelectorAll('[data-scenario]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.scenario==='rich' || mode==='old'){embed();return;}if(mode==='embed'){frame.contentWindow.postMessage({type:'DH_PREVIEW_SCENARIO',scenario:button.dataset.scenario},'*');return;}current=structuredClone(fixture);if(button.dataset.scenario==='switch'){current.name='另一测试角色';current.attrs={力量:3,生命:0,生命上限:8};}if(button.dataset.scenario==='updated'){current.attrs.希望=3;current.attrs.压力=0;}if(button.dataset.scenario==='missing'){current.attrs={敏捷:0,生命:0,希望:null};}frame.contentWindow.postMessage({type:'SEALCHAT_UPDATE',payload:current},'*');}));
+document.getElementById('width').addEventListener('input',event=>{frame.style.width=event.target.value+'px';document.getElementById('width-label').textContent=event.target.value;});
+document.getElementById('native').addEventListener('click',()=>native());
+document.getElementById('old').addEventListener('click',async()=>{mode='old';frame.srcdoc=await(await fetch('/old-reference.html')).text();});
+</script></body></html>

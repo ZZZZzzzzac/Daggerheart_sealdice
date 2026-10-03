@@ -3,20 +3,25 @@ format_version = "1.0.0"
 [package]
 id = "zac/daggerheart"
 name = "匕首之心"
-version = "0.4.2"
+version = "0.4.7"
 authors = ["ZZZZzzzzac"]
-license = "Apache-2.0"
-description = "《匕首之心》二元骰插件，从 .dd help 开始使用。"
+license = "MIT"
+description = "《匕首之心》二元骰与原生人物卡规则扩展：.dd / .ddr 掷骰、优劣势、难度比较、希望/压力及 GM 恐惧结算，输入 .dd help 开始使用。"
+homepage = "https://daggerheart.cn/"
+repository = "https://github.com/ZZZZzzzzac/Daggerheart_sealdice"
+keywords = ["Daggerheart", "匕首之心", "匕首心", "二元骰", "希望", "恐惧", "规则模板"]
 
 [package.seal]
 min_version = "1.6.1"
 
 [permissions]
 network = false
+network_hosts = []
 dangerous = false
 http_server = false
 file_read = []
 file_write = []
+ipc = []
 
 [contents]
 scripts = ["scripts/daggerheart.js"]
@@ -24,3 +29,6 @@ templates = ["templates/daggerheart.yaml"]
 
 [store]
 readme = "README.md"
+icon = "assets/icon.png"
+banner = "assets/banner.png"
+category = "rules"

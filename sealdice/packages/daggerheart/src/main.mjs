@@ -1,25 +1,22 @@
 import { parseRequest, rollRequest, formatRoll, formatSettlement } from './rules.mjs';
 import { evaluateNative } from './expression.mjs';
 import { bounded, settleOptional, parseGroupState } from './state.mjs';
+import {EXPERIENCE_FIELD, encodeExperiences, readExperiences, selectedExperiences} from './experiences.mjs';
+import {characterSummary} from './fields.mjs';
 
-const VERSION = '0.4.2';
+const VERSION = '0.4.7';
 const HELP = `.dd [算式] [adv/dis] [dc难度] [-- 原因]
 例：.dd 敏捷+2+2d6k1 adv dc15 -- 攀爬
-.ddr：反应掷骰；.st：属性与资源；.dh gm：指定GM。`;
+.dd：动作掷骰；.ddr：反应掷骰；人物卡可勾选经历，每项消耗1希望。
+.st：属性与资源；.dh exp：经历；.dh gm：指定GM。`;
 const GM_HELP = `.dh gm claim：自己担任GM
 .dh gm set 用户ID：指定GM；.dh gm clear：卸任
-.st 恐惧+1：调整GM自己的恐惧`;
+.st 恐惧+1：调整GM自己的恐惧
+.dh exp：查看经历；.dh exp clear：清空；PbDH“导出为海豹骰”的.st包含经历。`;
 const ext = seal.ext.new('daggerheart', 'Daggerheart workspace', VERSION);
-const DEFAULTS = { 敏捷: 0, 力量: 0, 灵巧: 0, 本能: 0, 风度: 0, 知识: 0 };
 const read = (ctx, key, type = 'int') => {
   const [value, exists] = type === 'str' ? seal.vars.strGet(ctx, key) : seal.vars.intGet(ctx, key);
-  if (exists) return value;
-  if (type === 'int' && seal.vars.strGet(ctx, '$t游戏模式')[0] === 'daggerheart' && Object.prototype.hasOwnProperty.call(DEFAULTS, key)) {
-    const [, isString] = seal.vars.strGet(ctx, key);
-    const [, isComputed] = seal.vars.computedGet ? seal.vars.computedGet(ctx, key) : [null, false];
-    if (!isString && !isComputed && (!seal.format || String(seal.format(ctx, `{${key}}`)).trim() === String(DEFAULTS[key]))) return DEFAULTS[key];
-  }
-  return null;
+  return exists ? value : null;
 };
 function optional(ctx, key, cap) {
   const value = read(ctx, key);
@@ -83,29 +80,51 @@ function recover(ctx) {
 function doRoll(ctx, msg, args, reaction) {
   const request = parseRequest(args, reaction);
   return mutation(ctx, msg, state => {
-    const hope = !reaction ? optional(ctx, '希望', 6) : null;
+    const experiences = selectedExperiences(read(ctx, EXPERIENCE_FIELD, 'str'), request.experiences);
+    const cost = experiences.length;
+    const hope = !reaction || cost ? optional(ctx, '希望', 6) : null;
+    if (cost && (hope === null || hope < cost)) throw Error(`希望不足：使用${cost}项经历需要${cost}点希望`);
+    if (cost) request.expression = `(${request.expression || '0'})+(${experiences.reduce((sum,item) => sum + item.modifier,0)})`;
     const stress = !reaction ? optional(ctx, '压力', Number.MAX_SAFE_INTEGER) : null;
     const gm = !reaction && state.gm && !ctx.isPrivate && ctx.group?.groupId ? target(ctx, state.gm) : null;
     const fear = gm ? optional(gm, '恐惧', 12) ?? 0 : null;
     const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, expression => evaluateNative(ctx, expression));
     const effects = { ...result.effects, hopeGain: hope === null ? 0 : result.effects.hopeGain,
       stressClear: stress === null ? 0 : result.effects.stressClear, fearGain: gm ? result.effects.fearGain : 0 };
-    const before = { 希望: hope, 压力: stress }, next = settleOptional(before, effects, fear);
+    const before = { 希望: hope, 压力: stress }, next = settleOptional({...before, 希望:hope === null ? null : hope - cost}, effects, fear);
     const values = {};
-    if (effects.hopeGain) values.希望 = next.values.希望;
+    if (cost || effects.hopeGain) values.希望 = next.values.希望;
     if (effects.stressClear) values.压力 = next.values.压力;
     const writes = changes(ctx, values);
     if (effects.fearGain) writes.push(...changes(gm, { 恐惧: next.fear }));
-    const summary = formatSettlement(before, next.values, fear, next.fear, effects);
+    const summary = formatSettlement(before, next.values, fear, next.fear, {...effects, hopeSpend:cost});
     const manual = [];
     if (result.effects.hopeGain && hope === null) manual.push('希望+1');
     if (result.effects.stressClear && stress === null) manual.push('压力-1');
     if (result.effects.fearGain && !gm) manual.push('恐惧+1');
     const tail = [summary, manual.length ? `手动：${manual.join('、')}` : ''].filter(Boolean).join(' ｜ ');
-    return { writes, reply: formatRoll(result, ctx.player.name, false) + (tail ? '\n' + tail : '') };
+    const experienceText = cost ? '\n经历：' + experiences.map(item => item.name + '(' + (item.modifier >= 0 ? '+' : '') + item.modifier + ')').join('、') + ` ｜ 希望消耗${cost}` : '';
+    return { writes, reply: formatRoll(result, ctx.player.name, false) + experienceText + (tail ? '\n' + tail : '') };
   });
 }
+function experienceCommand(ctx, args) {
+  if (args.length === 1) {
+    const items = readExperiences(read(ctx,EXPERIENCE_FIELD,'str'));
+    return items.length ? '经历：' + items.map((item,i) => `${i+1}. ${item.name} ${item.modifier >= 0 ? '+' : ''}${item.modifier}`).join('；') : '尚未导入经历';
+  }
+  if (load(ctx).pending) throw Error('上次操作未完成，请先执行 .dh recover');
+  let value;
+  if (args[1] === 'clear' && args.length === 2) value = encodeExperiences([]);
+  else if (args[1] === 'set' && args.length === 3) {
+    let decoded;
+    try { decoded = decodeURIComponent(args[2]); } catch { throw Error('经历导入编码无效'); }
+    value = encodeExperiences(readExperiences(decoded));
+  } else throw Error('用法：.dh exp / .dh exp clear；经历请使用PbDH“导出为海豹骰”录入');
+  seal.vars.strSet(ctx,EXPERIENCE_FIELD,value);
+  return `经历已写入当前人物卡（${readExperiences(value).length}项）`;
+}
 function gmCommand(ctx, msg, args) {
+  if (args[0] === 'exp') return experienceCommand(ctx,args);
   if (args[0] === 'recover' && args.length === 1) return recover(ctx);
   if (ctx.isPrivate || !ctx.group?.groupId) throw new Error('请在群聊中指定GM');
   if (args[0] !== 'gm') throw new Error('用法：.dh gm claim / set 用户ID / clear');
@@ -136,7 +155,8 @@ function register(name, help, execute) {
       const result = seal.ext.newCmdExecuteResult(true); result.showHelp = true; return result;
     }
     try {
-      if (args.length > 80 || args.join(' ').length > 1000) throw new Error('指令过长');
+      const maxLength = name === 'dh' && args[0] === 'exp' ? 4096 : 1000;
+      if (args.length > 80 || args.join(' ').length > maxLength) throw new Error('指令过长');
       if (cmdArgs.kwargs?.length) throw new Error('原因前加独立的 --');
       if (Array.from(cmdArgs.at || []).some(at => at.userId !== ctx.endPoint?.userId)) throw new Error('请用自己的角色掷骰');
       if (ctx.privilegeLevel < 0) throw new Error('无权执行此操作');
@@ -149,4 +169,15 @@ function register(name, help, execute) {
 register('dd', HELP, (ctx, msg, args) => doRoll(ctx, msg, args, false));
 register('ddr', HELP, (ctx, msg, args) => doRoll(ctx, msg, args, true));
 register('dh', GM_HELP, gmCommand);
+// 通过自有指令扩展只接管 dh 的 show/list；其余 .st 仍交给原生处理。
+const st=seal.ext.newCmdItemInfo();st.name='st';st.allowDelegate=true;
+st.solve=(ctx,msg,cmdArgs)=>{
+  const args=Array.from(cmdArgs.args || []);
+  if(read(ctx,'$t游戏模式','str')!=='daggerheart' || !['show','list'].includes(args[0]?.toLowerCase())) return seal.ext.newCmdExecuteResult(false);
+  if(ctx.privilegeLevel<0) return seal.ext.newCmdExecuteResult(true);
+  const target=seal.getCtxProxyFirst(ctx,cmdArgs);
+  seal.replyToSender(ctx,msg,characterSummary(key=>read(target,key),target.player.name,args.slice(1)));
+  return seal.ext.newCmdExecuteResult(true);
+};
+ext.cmdMap.st=st;
 seal.ext.register(ext);

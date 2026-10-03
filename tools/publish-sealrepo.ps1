@@ -24,6 +24,12 @@ function Api($path, $method = 'GET', $body = $null) {
     }
     return $response.data
 }
+function FileSha256([string]$path) {
+    $stream = [IO.File]::OpenRead($path)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
+    finally { $algorithm.Dispose(); $stream.Dispose() }
+}
 
 $manifest = [IO.File]::ReadAllText((Join-Path $root 'sealdice/packages/daggerheart/info.toml'))
 $id = [regex]::Match($manifest, '(?m)^id = "([^"]+)"').Groups[1].Value
@@ -39,7 +45,7 @@ try {
     try { $packedManifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
     if ($packedManifest -ne $manifest) { throw 'Built manifest differs from source; rebuild before publishing.' }
 } finally { $zip.Dispose() }
-$hash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+$hash = FileSha256 $artifact
 $null = Api '/user/me'
 $namespaces = @(Api '/user/namespaces')
 $repos = @(Api '/repo/my-repos')
@@ -81,7 +87,7 @@ try {
     $download = $origin + '/dice/api/store/packages/' + $namespace + '/' + $packageName + '/' + $version + '/' + [Uri]::EscapeDataString($packageName + '@' + $version + '.sealpack')
     $verification = Join-Path ([IO.Path]::GetTempPath()) ('sealrepo-verification-' + [Guid]::NewGuid().ToString('N') + '.sealpack')
     $null = Invoke-WebRequest -Uri $download -OutFile $verification -UseBasicParsing -TimeoutSec 60
-    $downloadHash = (Get-FileHash -LiteralPath $verification -Algorithm SHA256).Hash.ToLowerInvariant()
+    $downloadHash = FileSha256 $verification
     if ($downloadHash -ne $hash) { throw 'Public download SHA256 differs from the local package.' }
     Write-Output 'Public download SHA256 verified.'
     if ($public.data.verified_at) { Write-Output 'Repository verification: verified.' }
@@ -89,5 +95,9 @@ try {
 } catch {
     Write-Warning 'The commit succeeded, but public download verification failed. Inspect the workspace and artifact before retrying.'
     exit 1
+} finally {
+    if ($verification -and (Test-Path -LiteralPath $verification)) {
+        Remove-Item -LiteralPath $verification -Force
+    }
 }
 Write-Output ('https://repo.sealdice.com/packages?namespace=' + $namespace + '&package=' + $packageName)

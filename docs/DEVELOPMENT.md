@@ -1,54 +1,62 @@
-# 当前开发方式
+# 开发与发布
 
-## 新匕首之心核心
+## 工作入口
 
-开发入口 sealdice/packages/daggerheart：src/rules.mjs 是独立纯规则；src/state.mjs负责资源校验与纯结算；src/main.mjs 负责SealDice适配；info.toml负责包元信息与用户配置；templates/daggerheart.yaml为独立V2规则模板。规则参考正式版SRD2.0核心，扩展内容独立可选。
+- SealDice：`sealdice/packages/daggerheart/`，`info.toml` 为版本和包身份权威，包 ID 为 `zac/daggerheart`。`rules.mjs` 负责纯规则，`state.mjs` 负责纯结算，`expression.mjs` 复用原生 DiceScript，`main.mjs` 适配宿主；`experiences.mjs` 和 `fields.mjs` 分别维护经历格式、展示字段及金币单位。
+- SealChat：`sealchat/character-sheet/`，自有通用 HTML 使用原生人物卡协议；频道 Embed 是可选入口。数据和接口边界见 [CHARACTER_STATE.md](CHARACTER_STATE.md)。
+- `reference/` 是固定版本只读快照，只核对接口，不安装依赖、构建或部署。禁止修改、打补丁或重编译宿主；旧 `development/` 补丁方案已经清理。
+- `archive/sealchat-character-sheet/` 仅保留旧人物卡和皮肤的只读对照。旧插件、旧开发环境和临时产物已清理，历史从 Git 查阅。
+- 生产配置仅在旁边的 VPS 仓库维护。本地验收不读取生产 token、数据库或配置，不连接 IM 或真实付费 AI。
 
-npm test 会先构建sealpack，再验证144种基础二元骰组合、难度边界、优劣势抵消、反应资源规则、参数限制、宿主模拟和ZIP文件清单。npm run build使用esbuild与fflate，运行时不依赖它们。构建显式检查所有输入来自新src，资源采用白名单，不自动打包旧文件和reference。
+Node.js 22 或更新的受支持 LTS，npm 是唯一默认包管理器：
 
-旧插件、类型声明及其构建和测试入口已移除。旧功能需求见DAGGERHEART_REWRITE.md，原实现从Git历史查阅；新sealpack不复用旧源码。
+```powershell
+npm ci
+npm test
+npm run test:sheet
+npm run check-reference
+```
 
-## 实际宿主验收与发布
+`npm test` 构建并运行 41 项插件测试；`test:sheet` 构建并验证模型、协议、刷新队列和固定 Chat 的 HTML 注入。构建白名单只包含本项目源码、模板、README 与明确声明的许可/商店素材，不打包参考源码、凭据、测试替身或运行数据。
 
-本地测试不等于真实Goja/API或模板加载兼容。上线前用隔离1.6.1完成扩展包预览/安装/启用、脚本和模板重载、.set dh、.dd/.ddr、禁用/重新启用及卸载验收；停用旧同名指令。随后用户明确要求才上传指定包，不整包覆盖运行数据。
+`npm run build` 生成 `sealdice/packages/daggerheart/dist/daggerheart-版本.sealpack`。`npm run build:sheet` 生成通用 `daggerheart.html` 与可选 `daggerheart-embed.html`，不接收存档或生成角色专属 HTML。构建产物、依赖和本地运行目录均忽略，不提交 Git。
 
-0.4.2按希望/压力字段存在与否独立结算；GM恐惧写入指定GM当前群绑定卡，只有GM身份按群保存在扩展。手动资源增减统一.st；公开.dh仅GM操作，recover为维护入口。
+## 人物卡与 PbDH
 
-## SealChat
+PbDH 的“导出为海豹骰”复制同一条 `.st`，包含数值、金币把/袋/箱及最多 5 项经历名称/整数修正。经历以小型版本化 JSON 字符串保存到 Dice 绑定卡的 `DH经历`，空列表清除旧经历；不导入图片、职业、装备或其他参考资料。
 
-人物卡与频道工具分别按固定快照的doc/character-sheet-template-development.md、doc/channel-embed-api-developer-guide.md开发；两者不是相同协议。数据由Dice当前频道绑定卡统一保存；具体写回风险、反馈与验收要求见CHARACTER_STATE.md。无需为普通人物卡修改核心。
+HTML 接收 `SEALCHAT_UPDATE`，用 `ROLL_DICE/template` 发送 `.st/.dd/.ddr`，不用整卡 `UPDATE_ATTRS`、`characterCard.updateAttrs`、`character.set` 或本地/共享 Storage。资源操作使用相对 `.st`，约 10 秒回读；明确的 0 保留，未录入字段显示未知。
 
-生产Chat在/chat/，Dice专用连接ws://127.0.0.1:3212/chat/ws/seal；生产配置仅在VPS仓库维护。测试不使用生产token、聊天数据库或真实群消息。
+勾选经历时每项自动扣 1 希望，插件从当前卡计算修正和费用；余额不足、经历版本变化或算式错误在投骰前拒绝。费用先支付，再结算收益；恢复沿用角色标识、字段前后值与稳定 rawId 去重。原生 `.st` 与插件写入没有跨库事务或严格外部并发保证，属性约 60 秒落盘。
 
-## 上游参考
+`npm run preview:sheet` 开启仅本机的协议预览，使用合成数据，只记录命令。旧版 UI 对照来自 archive；固定 Chat 的真实 IframeSandbox 注入代码只读提取用于测试，不进入交付 HTML。3D 注解输出实际骰面，固定 Chat 只有整次统一皮肤，不能逐骰区分希望/恐惧颜色。
 
-reference默认只读，不构建、不安装依赖、不部署；npm run check-reference检查固定快照。包格式与宿主API以对应1.6.1源码核对，在线文档可能领先生产。需要改核心时另外建立development工作副本。
+## 隔离官方宿主验收
 
-## 当前验收与持久化边界
+使用未修改的官方 SealDice 1.6.1 二进制，在唯一的忽略 runtime 中验收，不接 IM：
 
-30项测试覆盖二元骰、独立字段、另一个GM用户卡、权限、去重、跨卡失败恢复和旧状态升级。运行python tools/native-smoke.py --binary <官方1.6.1绝对路径>，验收安装、缺失与零值、GM当前卡、手动修正、重载、等待保存周期后重启及卸载。测试helper仅存在唯一忽略runtime，通过真实newMessage/createTempCtx读取第二用户卡，不打包、不接IM或生产。随机骰使用有界循环。
+```powershell
+python tools/native-smoke.py --binary <官方1.6.1绝对路径> --restart-before-enable
+python tools/native-smoke.py --binary <官方1.6.1绝对路径> --experiences-only
+python tools/native-smoke.py --binary <官方1.6.1绝对路径> --summary-gold-only
+```
 
-属性约60秒周期保存；意图日志不是人物属性的跨库事务，也不锁住外部.st/character.set。恢复验证原玩家和GM的卡标识与字段前后值。不同群绑定同一GM卡会共享卡上恐惧。
+完整验收覆盖安装、启用、`.set dh`、零值/缺失字段、原生算式、玩家资源与 GM 当前群绑定卡恐惧、重载、保存周期后的重启和卸载。经历验收覆盖 Unicode/引号、多项/零修正费用、失效选择及错误不扣费；`--st-export-fixture` 可传入实际 PbDH 格式器生成的合成命令/经历 JSON。展示/金币验收覆盖白名单、别名、原生命令回退和三个单位持久化。
 
-当前豹仓版本为zac/daggerheart@0.4.2，公开下载已核对SHA256，尚未标记verified；不等于生产部署。Chat、PbDH导入、昵称标签及完整术语库待后续。旧0.2.x升级步骤见包README，不隐式迁移旧池，未完成旧写入须先在0.2.1恢复。
+Windows 禁用重载后重新启用可能遇到官方宿主缓存目录重命名 `Access is denied`；`--restart-before-enable` 在重新启用前重启隔离宿主，不修改核心。每次只停止自有进程；报告写到该 runtime 的 `native-report.json`，发布前确认 `passed` 与 `persistence_checked` 为 true。
 
-## 原生表达式接口
-
-expression.mjs仅适配ctx.eval与ctx.genDefaultRollVmConfig，复用人物属性加载钩子和原生DiceScript语法；rules只拆.dd选项，不实现算式语法。完整括号封装避免尾部被当原因；返回值toJSON区分错误t=0/v=null与数字0，避免readInt对错误对象造成Go panic。算式只执行一次，失败不投二元骰也不结算。数字小计含整数/浮点；l1仅对骰子词转换为kl1，不改属性或字符串。用户自定义属性、别名、模板默认值及缺失变量遵从原生.r。
-
-真实宿主覆盖用户原式、确定性d1对照.r、括号、多属性、自定义字段、别名、修改.st后新值、浮点、数组取高、求和与abs函数、非法尾部及除零。
-
-0.4.1仅调整掷骰显示：单组结果使用[N]，难度显示实际比较符号。用native-smoke.py --skip-restart复验；持久化重启沿用0.4.0验证，不宣称本次重新验收重启。
+测试不会代替完整未修改 Chat/Dice 的真实联动验收。仍须核对模板保存/绑定、数据下发、当前聊天身份路由、扣费回复与轮询；完整昵称徽章和术语库也未完成。详见 [重写范围](DAGGERHEART_REWRITE.md)。
 
 ## 豹仓发布
 
-包ID为zac/daggerheart，显示名为匕首之心；脚本与规则模板ID均为daggerheart，产物为dist/daggerheart-版本.sealpack。0.4.2仅统一包身份和文件名，掷骰规则不变。旧daggerheart-local/core先停用；包身份不同，GM指定和待恢复写入不能假定自动迁移，升级说明见包README。
+发布仅操作 `zac/daggerheart`，正式上传需用户明确要求；不意味着生产服务器已安装。令牌放忽略的根目录 `.env.local`（`SEALREPO_TOKEN`）或同名进程环境变量；`.env.example` 只留空字段。不得打印令牌、将其放命令参数、提交 Git 或转发到预签名上传存储。
 
-本地CLI令牌放根目录.env.local的SEALREPO_TOKEN，已被Git忽略；.env.example仅含空字段。发布脚本也接受同名进程环境变量，不在命令参数中传令牌、不输出令牌、不将认证头转发到上传存储。
+完成当前版本本地测试与隔离宿主验收后：
 
-完成当前版本隔离宿主验收后，运行npm run publish:sealrepo：先构建并跑测试，再按info.toml申请上传、PUT包、提交版本；只操作zac/daggerheart。首次创建已选定的zac命名空间与daggerheart包。同版本存在时停止，上传或提交断线后先在豹仓查看真实状态，再重试，避免重复发布。powershell -NoProfile -NonInteractive -File tools/publish-sealrepo.ps1 -Check仅校验凭据及本地产物。
+```powershell
+npm run publish:sealrepo
+```
 
-官方接口依据https://repo.sealdice.com/sealpack/页面的发布实现。豹仓发布、审核和公开可下载是不同状态；上传成功后核对状态并从公开下载校验SHA256。发布不代表生产服务器已安装。
+入口先构建/测试，再申请上传、PUT 本地包并提交版本。只校验凭据和本地产物可运行 `powershell -NoProfile -NonInteractive -File tools/publish-sealrepo.ps1 -Check`。同版本存在时停止；断线或提交后校验失败时，先核对豹仓实际状态和包摘要，不盲目覆盖或重发。
 
-
-0.4.2已完成30项测试及隔离官方1.6.1的安装、启用、掷骰、资源结算、保存周期后的重启和卸载验收。测试使用新的zac/daggerheart包ID，未连接生产或IM。
+提交成功后查询公开版本、下载并比较 SHA256。上传成功、审核标记 verified、公开可下载和生产部署是不同状态，分别据实报告。包升级和恢复步骤见包 README。

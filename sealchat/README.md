@@ -1,8 +1,7 @@
 # 匕首之心 SealChat 二次开发
 
-P2从零实现PbDH角色的聊天人物卡，P3以昵称label展示玩家资源及GM恐惧。当前完成需求与接口调查，本目录尚无新实现。工作项见[GitHub Issues](../docs/GITHUB_ISSUES.md)。
+默认使用 character-sheet 中的原生人物卡 HTML，保留此前 UI，已有 ROLL_DICE 模板模式发送 .dd/.ddr/.st。无需频道嵌入窗、宿主源码补丁或重编译，不走整卡 UPDATE_ATTRS。
 
-- PbDH负责静态资料、特质、经历、装备与升级，通过.pbcha导入及更新；Chat只读展示和使用这些资料，不构建静态编辑器，不接旧zzz车卡器。
-- Dice保存生命、压力、护甲、希望、金币等动态资源及共享GM恐惧，Chat负责操作、确认与刷新；重新导入保护跑团资源。
-- 使用现有昵称label/徽章显示状态，不另建GM资源窗口或倒计时，不实现援助确认流程。
-- 人物卡遵循固定版本HTML协议；现有写回与刷新限制见[同步契约](../docs/CHARACTER_STATE.md)。必要核心改动在development副本实现，reference只读。
+Dice保存已有数值及小型经历列表。PbDH“导出为海豹骰”的同一条.st包含数值及最多5项经历名称/修正，写入Dice当前绑定卡。掷骰窗可勾选经历，每项自动消耗1希望，希望不足时不投骰。所有角色使用同一HTML，无需生成角色专属模板。其他PbDH资料不导入、不展示；图片不嵌入，头像使用Chat现有功能。
+
+频道嵌入窗版是可选入口，原生安装见 character-sheet/README.md；数据与真实限制见 ../docs/CHARACTER_STATE.md。未部署生产，未完成未修改Chat/Dice真实联动验收。
