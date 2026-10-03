@@ -1,6 +1,6 @@
 # PbDH 外部 iForm 实验
 
-独立路线：Seal 工作树 `codex/pbdh-iframe-sync`；PbDH 工作树 `codex/sealchat-iframe-sync`。两边从已提交版本开始，不包含主工作区未提交的原生人物卡/经历导出修改。本目录不依赖现有 `sealchat/character-sheet`，不修改 SealChat / SealDice 宿主或生产配置。
+独立路线：Seal 工作树 `codex/pbdh-iframe-sync`；PbDH 工作树 `codex/sealchat-iframe-sync`。目前已合并 Seal master `8d6526c`（sealpack 0.4.7）与 PbDH main `f6261fa`，不包含主工作区未提交内容。本目录不依赖现有 `sealchat/character-sheet`，不修改 SealChat / SealDice 宿主或生产配置。
 
 PbDH 实验前端通过宿主提供的 Channel Embed SDK 接入，四项控件显示 Dice 当前资源及上限；不把会话覆盖存进 PbDH 存档。操作发相对 `.st`，不调用 UPDATE_ATTRS、characterCard.updateAttrs 或 character.set，不上传图片、不用 Embed Storage、不接真实 AI。
 
@@ -13,13 +13,14 @@ npm run build:pbdh-embed -- https://your-pbdh.example/pbdh/player/daggerheart-co
 npm run test:pbdh-embed
 ```
 
-产物在 `dist/iframe.html` 与 `dist/bridge-policy.json`。在现有 SealChat 的频道 iForm 管理界面：
+产物在 `dist/iframe.html`、`dist/bridge-policy.json` 与 `dist/presentation.json`。在现有 SealChat 的频道 iForm 管理界面：
 
 1. 将 `iframe.html` 的单个 `<iframe src>` 粘贴到嵌入代码。必须是直接外部 iframe；不要套进原生人物卡 HTML 或外层 srcdoc。
 2. 启用 Embed API，允许 PbDH 所在 origin，授予 `context.read`、`characterCard.read`、`messages.send`。JSON 只是字段配置参考，不宣称宿主支持文件导入。
-3. 固定版本对单个 iframe 嵌入代码追加 `hostOrigin` / `sdkUrl`。PbDH 校验两者一致并从该实例加载 SDK；`/chat/` 前缀由宿主处理。URL-only iForm 分支未核实参数注入，所以使用已核对的单 iframe 嵌入代码入口。
+3. 窗口默认宽 840、高 790，iframe 填满官方相对定位容器；拖窗口边缘时内容跟随缩放。840px 宽可容纳约 794px 的 A4，触发 PbDH 原有 1080px 窄屏布局，卡牌桌面位于下方。已有浮窗可能保留旧尺寸，需拖动缩窄或关闭重开。固定版本对单个 iframe 嵌入代码追加 `hostOrigin` / `sdkUrl`；URL-only 分支没有这项注入。PbDH 校验两者一致并从该实例加载 SDK，`/chat/` 前缀由宿主处理。
 4. 在隔离账号/频道启用官方 BOT 人物卡 API、自有 sealpack，先用既有 `.st` 录入资源及上限，选择自己的活动人物卡。
 5. PbDH 中选择对应人物，核对页面显示的 PbDH / Dice 名称，点击“确认关联当前人物卡”。四项余额来自 Dice；未录入字段显示未知且禁用，不填 0。
+6. 点击原有六特质的标签或数值格打开掷骰助手，暂停关联后恢复属性编辑；不改 PbDH 皮肤、布局或独立模式。支持优劣势、反应、修正、难度、原因、经历勾选及手动 `.dd/.ddr` 公式。特质/经历读取 Dice；经历费用由 sealpack 0.4.7 校验并结算。升级不会自动补回旧版本已经丢失的零字段，需重新显式导入相应数值。
 
 | PbDH Module | Dice 当前值 | Dice 上限 | 含义 |
 | --- | --- | --- | --- |
@@ -51,4 +52,6 @@ npm run preview:pbdh-embed -- "D:\path\to\PbDH\apps\platform\dist" "D:\path\to\r
 - 资源修改会留下普通聊天消息。最大值在实验模式只读，使用既有显式导入/命令配置。不新增宿主补丁来绕过限制。
 - 协议fixture / 单元测试 / 静态构建通过只证明自有代码和固定 SDK 通信。上线前仍需未修改官方Chat/Dice的隔离真实联动，用户明确要求才发布或部署。
 
-当前实验验证：PbDH `npm run verify` 通过（1406 项前端测试、178 项 Python 测试、边界/契约/类型检查和构建）；iForm 配置测试通过。浏览器验证实际 SDK 的跨域握手/读卡/上下文及断线事件，同源 fixture 验证四项按钮只发相对 `.st`、外部结算回读、切卡解除关联、断线禁用、会话失效重连，以及普通 PbDH 存档数值未被会话覆盖。未部署，未运行真实官方 Chat/Dice 联动。
+当前验收：PbDH `npm run verify` 通过（1419 项前端测试、178 项 Python 测试、边界/契约/类型检查和构建）；sealpack 41、原生卡 21、iForm 配置 2 项测试通过，固定参考清单一致。官方未修改 Chat 20260921 / Dice 1.6.1 本地实例已运行，`zac/daggerheart` 0.4.7 已启用；真实 iForm 读取活动卡，默认 840px，拖宽到 1040px 时 iframe 跟随，原有窄屏布局把桌面放到下方。同源 fixture 验证现有力量格点击、Dice 零特质显示、优势/反应/经历/DC/原因的单条 SDK 消息发送；夹具只记录投骰请求，不冒充真实扣费结算。生产未部署；完整真实人物操作、经历费用和回复回读仍需本地试用验收。
+
+助手交互只读核对了当前 [SealChat master 的 DiceRollPopover.vue](https://github.com/kagangtuya-star/sealchat/blob/7a7b5bb424ae08e4954a2078833b172dbac847b7/ui/src/views/chat/components/character-sheet/DiceRollPopover.vue)（核对时 master 即固定版本 7a7b5bb），以及本项目 master 的原生匕首之心卡。自有实现用 `.dd/.ddr adv/dis`，保留匕首之心经历协议；不复制或修改宿主组件。

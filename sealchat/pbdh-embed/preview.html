@@ -17,7 +17,7 @@ const seenNonces = new Set();
 const capabilities = ['context.read', 'characterCard.read', 'messages.send'];
 let contextVersion = 1, active = 0, connected = true;
 const cards = [
-  { name: '隔离角色 A', sheetType: 'daggerheart', attrs: { 生命: 0, 生命上限: 6, 压力: 2, 压力上限: 6, 护甲: 0, 护甲上限: 3, 希望: 2, 希望上限: 6 } },
+  { name: '隔离角色 A', sheetType: 'daggerheart', attrs: { 生命: 0, 生命上限: 6, 压力: 2, 压力上限: 6, 护甲: 0, 护甲上限: 3, 希望: 2, 希望上限: 6, 敏捷: -1, 力量: 0, 灵巧: 0, 本能: 2, 风度: 1, 知识: 3, DH经历: JSON.stringify({schemaVersion:1, experiences:[{name:'隔离测试经历',modifier:2}]}) } },
   { name: '隔离角色 B', sheetType: 'daggerheart', attrs: { 生命: 1, 生命上限: 6, 压力: 0, 压力上限: 6, 护甲: 1, 护甲上限: 3, 希望: 5, 希望上限: 6 } },
 ];
 const sent = [];
@@ -42,9 +42,9 @@ window.addEventListener('message', e => {
       else if (req.method === 'messages.send') {
         if (!connected || req.params.identityId !== context().currentCharacter.id) throw Error('PERMISSION_DENIED');
         const match = /^\.st (生命|压力|护甲|希望)([+-])1$/.exec(req.params.text);
-        if (!match) throw Error('INVALID_PARAMS');
-        const key = match[1], delta = match[2] === '+' ? 1 : -1;
-        cards[active].attrs[key] += delta;
+        if (!match && !/^\.ddr?(?: |$)/.test(req.params.text)) throw Error('INVALID_PARAMS');
+        if (match) { const key = match[1], delta = match[2] === '+' ? 1 : -1; cards[active].attrs[key] += delta; }
+        // 只记录投骰请求，不伪装为实际 Dice 掷骰或费用结算。
         sent.push(req.params.text); render(); result = { id: crypto.randomUUID() };
       } else throw Error('CAPABILITY_DENIED');
     } catch (e) { error = { code: e.message, message: e.message }; }
