@@ -12,6 +12,9 @@
     "test": "node tools/build-sealpack.cjs && node --test sealdice/packages/daggerheart/tests/*.test.mjs",
     "check-reference": "node tools/check-reference.cjs",
     "publish:sealrepo": "npm test && powershell -NoProfile -NonInteractive -File tools/publish-sealrepo.ps1",
+    "build:sheet": "node tools/build-character-sheet.cjs",
+    "test:sheet": "node tools/build-character-sheet.cjs && node --test sealchat/character-sheet/tests/*.test.mjs",
+    "preview:sheet": "node tools/build-character-sheet.cjs && node tools/preview-character-sheet.cjs",
     "build:pbdh-embed": "node tools/build-pbdh-embed.mjs",
     "test:pbdh-embed": "node --test sealchat/pbdh-embed/config.test.mjs",
     "preview:pbdh-embed": "node tools/preview-pbdh-embed.mjs"

@@ -1,10 +1,27 @@
-# 匕首之心 sealpack · 0.4.2
+# 匕首之心 sealpack · 0.4.7
 
 属性与资源统一用原生 .st；无需 Chat、.dh init、完整资源或静态上限。
 
+术语统一使用“掷骰”：.dd 为动作掷骰，.ddr 为反应掷骰；掷出武器或能力的伤害骰称为伤害掷骰。本包的二元骰入口用于动作掷骰和反应掷骰，伤害掷骰使用宿主原生 .r 算式。
+
+作者：ZZZZzzzzac · 分类：规则扩展（rules） · 许可：[MIT](assets/LICENSE)。
+主页：[GitHub README](https://github.com/ZZZZzzzzac/Daggerheart_sealdice#readme) · 仓库：[Daggerheart_sealdice](https://github.com/ZZZZzzzzac/Daggerheart_sealdice) · 问题反馈：[Issues](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues)。
+
+## 权限与许可
+
+本包不申请网络访问、额外文件读写、执行外部程序、启动 HTTP 服务或包间通信权限；网络域名、文件路径与通信包白名单均为空。主页链接不意味着运行时需要联网。
+
+通过宿主原生人物属性接口读取当前玩家卡及指定GM当前群绑定卡，自动结算写入玩家希望/压力、GM恐惧及恢复角色标识；经历导入额外只写当前玩家卡DH经历字符串。GM指定、操作去重和恢复意图使用宿主扩展storage。空文件权限不代表不保存人物属性或扩展状态。
+
+本 sealpack 自有代码与文档使用 MIT 许可，全文随包提供。Daggerheart 名称、商标及规则资料的权利仍归原权利人；包内 MIT 声明不授予第三方规则资料或品牌素材的使用权。本项目为非官方扩展。
+
+图标与 banner 使用 Darrington Press 社区内容兼容标识，素材归属及许可范围见 [NOTICE.md](assets/NOTICE.md)，不纳入 MIT 许可。商店 banner 采用深色文字的全彩版本。
+
 ## 开始使用
 
-从豹仓安装 zac/daggerheart，或在 SealDice 1.6.1 及以上上传 daggerheart-0.4.2.sealpack，启用并重载包；停用旧同名插件。
+在 SealDice 1.6.1 及以上上传 daggerheart-0.4.7.sealpack，启用并重载包；停用旧同名插件。豹仓安装入口为 [zac/daggerheart](https://repo.sealdice.com/packages?namespace=zac&package=daggerheart)，公开版本不等于当前本地产物。
+
+Windows 官方 1.6.1 隔离验收中，禁用并重载后重新启用可能遇到缓存目录重命名 `Access is denied`。遇到此错误时先重启宿主，再重新启用并重载；不修改宿主源码或人物数据。
 
     .set dh
     .st 敏捷2 希望2 压力0
@@ -27,7 +44,7 @@
 - 各项独立生效，不依赖生命、护甲、金币或上限。缺失的玩家字段不创建，仅提示手动结算。
 - .ddr不产生希望、恐惧或清压力。
 
-六属性默认0；希望/压力/恐惧的默认表达式null表示未设置，确保初次.st 希望0 / 压力0真实存入卡中。.st del 希望可退出希望自动结算。生命、压力、护甲表示已标记槽，希望为可用点数。
+六特质、生命/压力/护甲/希望/恐惧/金币、四项资源上限、闪避与伤害阈值统一以默认表达式null表示未设置，确保初次.st写入0时真实存入卡中、导给Chat仍保留0。缺失特质不当作0，须先录卡；.dd无属性的数字掷骰仍可直接用。.st del 希望可退出希望自动结算。生命、压力、护甲表示已标记槽，希望为可用点数。
 
 ## GM
 
@@ -48,7 +65,15 @@
 
 数字修正不自动扣希望，费用由玩家用.st管理。反应同样如此。
 
+人物卡勾选经历时，每项自动消耗1希望，修正累加；动作掷骰和反应掷骰均生效，0修正也消耗希望。插件读取当前DH经历和希望，余额不足、经历版本变更或算式错误时在投骰前拒绝；先付费用，再应用希望收益，扣费沿用去重/失败恢复，不另发.st。
+
+PbDH“导出为海豹骰”的同一条.st包含原有数值及DH经历，只保存最多5项名称/整数修正，不保存图片或其他PbDH资料。`.dh exp`查看，`.dh exp clear`清空；普通`.st show`隐藏JSON，`.st export`仍可包含它，`.st clr`会一起清除。经历修改后重新导出并录卡，同一通用HTML即可。
+
 ## 升级与恢复
+
+0.4.4将零值保留扩展到六特质，避免Chat中力量0、灵巧0等显示未知并禁用掷骰。旧版本省略的特质须重新发送PbDH的.st导出；截图中两项确为0时也可在绑定卡上 `.st 力量0 灵巧0`。人物卡HTML也需更新到当前版，导入入口和UI说明清理见sealchat/character-sheet/README.md。
+
+0.4.3修复初次导入生命0、护甲0等数值被原生.st省略，导致Chat标签和人物卡显示空白的问题。更新并重载包后，在对应频道绑定正确角色，重新发送导入的.st，或确认这两项确实为0后发送 `.st 生命0 护甲0`，再刷新人物卡。已被旧版本省略的字段无法自动判断是0还是尚未录入，不自动补0；无需修改或重新编译Dice/Chat。
 
 包ID已统一为zac/daggerheart；旧daggerheart-local/core须先停用。需要保留旧包GM身份或未完成写入时，先在旧包完成恢复并记录GM，再启用新包重新指定GM；人物卡资源仍由原生.st保存。
 
@@ -60,8 +85,12 @@
 
 src/rules.mjs包含规则和掷骰/结算文案；src/main.mjs包含帮助、GM命令、人物卡读写及恢复；src/state.mjs包含独立字段结算；templates/daggerheart.yaml包含模板及.st展示。npm test / npm run build生成dist，不直接修改产物。
 
-30项测试；tools/native-smoke.py用隔离官方1.6.1验收缺失/零值字段、另一个用户的GM卡、手动数字修正、重载、重启及卸载，不接IM或生产。没有网络/HTTP/文件读写权限。Chat人物卡、PbDH导入、昵称标签与完整术语库尚未实现。
+41项测试；tools/native-smoke.py用隔离官方1.6.1验收，不接IM或生产。--zero-resources-only验证零值录入等；--experiences-only验证经历字符串、Unicode/引号、多项/零修正费用、希望不足、版本变更、无效算式、包重载及保存周期后的重启；--summary-gold-only验证.st show白名单、三种金币、原生命令回退和重启持久化。没有网络/HTTP/文件读写权限。Chat人物卡在sealchat/character-sheet维护；完整Chat联动验收、昵称标签集成与术语库尚未完成。
 
 规则依据：官方SRD 2.0核心 https://www.daggerheart.com/srd/ 。
 
 结果示例：希望[12]+恐惧[7]+(+2+4d6)[14]=33 > 难度19。优势/劣势也用[N]显示出目；相等显示=，小于显示<，关键成功仍按二元骰相同出目判断。
+
+3D骰子回复使用希望N[1d12]+恐惧N[1d12]及优劣势N[1d6]，面值来自实际结果，兼容固定SealChat的机器人注解解析。当前宿主整次掷骰只有统一皮肤，不支持逐骰希望/恐惧颜色。
+
+.st show/list在daggerheart模式下仅显示已录入的白名单整数数值，保留0，隐藏DH角色标识、DH经历和其他任意字段；.st写入、增减、导出等仍由原生命令处理。DH角色标识用于恢复时核对卡身份，需要保留。金币把/金币袋/金币箱及别名把/袋/箱独立保存；旧金币不自动转换。HTML不显示恐惧，GM恐惧存储和结算保持原有行为。

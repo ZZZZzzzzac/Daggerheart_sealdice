@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>匕首之心角色卡</title><style>/* STYLES */</style></head>
+<body>
+<main class="sheet">
+  <header class="section header">
+    <div class="header-main"><div class="avatar"><img id="avatar" alt="角色头像" hidden><span id="avatar-placeholder" aria-hidden="true">◇</span></div><div class="header-info"><h1 id="name">等待人物卡</h1></div></div>
+    <div class="header-side"><div class="defense-item"><span class="defense-key">闪避</span><button type="button" id="evasion" class="resource-adjust" data-edit-field="闪避" aria-label="修改闪避">—</button></div><div class="defense-item"><span class="defense-key">阈值</span><span id="thresholds">— / —</span></div></div>
+  </header>
+  <div class="section status"><p id="connection" role="status">等待 SealChat 下发人物卡数据…</p><div class="resource-controls"><button id="refresh" type="button">刷新数值</button><button id="reconnect" type="button">重连</button></div></div>
+  <section class="section" aria-label="六特质"><div id="traits" class="grid6"></div></section>
+  <section class="section" aria-label="跑团资源"><div id="resources" class="resource-wrap"></div></section>
+  <section class="section" aria-labelledby="experiences-title"><h2 id="experiences-title" class="section-title">经历 Experiences</h2><div id="experiences" class="exp-wrap"></div></section>
+  <section class="section" aria-labelledby="gold-title"><h2 id="gold-title" class="section-title">金币 Gold</h2><div id="gold" class="gold-wrap"></div></section>
+  <section class="section roll-feedback"><p id="feedback" role="status" aria-live="polite"></p></section>
+</main>
+<dialog id="roll-modal" aria-labelledby="modal-title">
+  <form id="options" novalidate>
+    <h2 id="modal-title" class="modal-title">动作掷骰</h2>
+    <div class="modal-mode-row"><button type="button" data-edge="adv" aria-pressed="false">优势</button><button type="button" data-edge="dis" aria-pressed="false">劣势</button><button type="button" id="reaction" aria-pressed="false">反应掷骰</button></div>
+    <p class="roll-note">属性修正 <b id="trait-mod">—</b></p>
+    <fieldset id="experience-options" hidden><legend>经历</legend><div id="roll-experiences"></div><p id="experience-cost" class="roll-note"></p></fieldset>
+    <label class="control">额外调整值<input name="modifier" type="text" inputmode="decimal" placeholder="0" maxlength="16"></label>
+    <label class="control">难度<input name="difficulty" type="text" inputmode="numeric" placeholder="可不填" maxlength="12"></label>
+    <label class="control">原因<input name="reason" type="text" placeholder="可不填" maxlength="200"></label>
+    <p id="roll-error" class="error" role="alert"></p>
+    <button id="confirm-roll" class="modal-btn hope-btn" type="button">掷骰</button>
+    <button id="cancel-roll" class="modal-cancel" type="button">取消</button>
+  </form>
+</dialog>
+<dialog id="value-modal" aria-labelledby="value-title">
+  <h2 id="value-title" class="modal-title">修改数值</h2>
+  <label class="control">新数值<input id="value-input" type="text" inputmode="numeric" maxlength="16"></label>
+  <button id="save-value" class="modal-btn hope-btn" type="button">保存</button>
+  <button id="cancel-value" class="modal-cancel" type="button">取消</button>
+</dialog>
+<script>/* SCRIPT */</script>
+</body></html>

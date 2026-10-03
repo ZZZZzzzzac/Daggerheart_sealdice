@@ -1,21 +1,35 @@
 name: daggerheart
 fullName: 匕首之心正式版核心
 authors: [Daggerheart workspace]
-version: 0.4.1
+version: 0.4.7
 templateVer: "2.0"
-updatedTime: "2026-10-02"
+updatedTime: "2026-10-03"
 attrs:
-  defaults:
-    敏捷: 0
-    力量: 0
-    灵巧: 0
-    本能: 0
-    风度: 0
-    知识: 0
+  defaults: {}
   defaultsComputed:
+    # 未录入与明确的 0 必须区分，否则原生 .st 会省略首次写入的零值。
+    敏捷: "null"
+    力量: "null"
+    灵巧: "null"
+    本能: "null"
+    风度: "null"
+    知识: "null"
+    生命: "null"
     希望: "null"
     压力: "null"
+    护甲: "null"
     恐惧: "null"
+    金币: "null"
+    金币把: "null"
+    金币袋: "null"
+    金币箱: "null"
+    生命上限: "null"
+    压力上限: "null"
+    护甲上限: "null"
+    希望上限: "null"
+    闪避: "null"
+    重伤阈值: "null"
+    严重阈值: "null"
   detailOverwrite: {}
 alias:
   敏捷: [agility, agi]
@@ -30,18 +44,22 @@ alias:
   希望: [hope]
   恐惧: [fear]
   金币: [gold]
+  金币把: [把]
+  金币袋: [袋]
+  金币箱: [箱]
   生命上限: [hpMax]
   压力上限: [stressMax]
   护甲上限: [armorMax]
 commands:
   set:
     diceSides: "20"
-    enableTip: ".dd：掷骰；.ddr：反应掷骰。"
+    enableTip: ".dd：动作掷骰；.ddr：反应掷骰。"
     keys: [dh, daggerheart, 匕首之心]
     relatedExt: [daggerheart]
   sn: {}
   st:
     show:
-      top: [敏捷, 力量, 灵巧, 本能, 风度, 知识, 生命, 压力, 护甲, 希望, 恐惧, 金币]
+      top: [敏捷, 力量, 灵巧, 本能, 风度, 知识, 生命, 压力, 护甲, 希望, 恐惧, 金币把, 金币袋, 金币箱]
+      ignores: [DH经历, DH角色标识]
       sortBy: name
       itemsPerLine: 4

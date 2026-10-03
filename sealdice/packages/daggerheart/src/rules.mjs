@@ -1,3 +1,4 @@
+import {parseExperienceToken} from './experiences.mjs';
 // Only .dd options are parsed here; arithmetic belongs to the host .r engine.
 export function parseRequest(args, reaction = false) {
   if (args.length > 80 || args.join(' ').length > 1000) throw new Error('指令过长');
@@ -9,7 +10,10 @@ export function parseRequest(args, reaction = false) {
   let depth = 0, quote = '', escaped = false;
   for (const raw of tokens) {
     let match;
-    if (!depth && !quote && (match = /^(adv|优势|优|dis|劣势|劣)(\d*)$/i.exec(raw))) {
+    if (!depth && !quote && raw.startsWith('exp=')) {
+      if (request.experiences) throw Error('经历只能选择一次');
+      request.experiences = parseExperienceToken(raw);
+    } else if (!depth && !quote && (match = /^(adv|优势|优|dis|劣势|劣)(\d*)$/i.exec(raw))) {
       const count = Number(match[2] || 1);
       if (!Number.isSafeInteger(count) || count < 1 || count > 20) throw new Error('优劣势来源数须为1–20');
       if (['adv', '优势', '优'].includes(match[1].toLowerCase())) request.advantages += count;
@@ -67,10 +71,11 @@ export function formatRoll(result, name, hints = true) {
   const outcome = critical ? '关键成功' : request.reaction
     ? (success === null ? '待定' : success ? '成功' : '失败')
     : `${withHope ? '希望' : '恐惧'}${success === null ? '' : success ? '成功' : '失败'}`;
-  let expression = `希望[${hope}]+恐惧[${fear}]`;
+  // 海豹注解携带实际面值，供 SealChat 的公开机器人回复解析器生成 3D 骰子。
+  let expression = `希望${hope}[1d12]+恐惧${fear}[1d12]`;
   if (request.expression) expression += `+(${result.expression})[${modifier}]`;
-  if (advantage) expression += `${advantage > 0 ? '+' : '-'}${advantage > 0 ? '优势' : '劣势'}[${Math.abs(advantage)}]`;
-  const lines = [`【${name}】${request.reaction ? '反应掷骰' : '掷骰'} · ${outcome}${request.reason ? ` · ${request.reason}` : ''}`,
+  if (advantage) expression += `${advantage > 0 ? '+' : '-'}${advantage > 0 ? '优势' : '劣势'}${Math.abs(advantage)}[1d6]`;
+  const lines = [`【${name}】${request.reaction ? '反应掷骰' : '动作掷骰'} · ${outcome}${request.reason ? ` · ${request.reason}` : ''}`,
     `${expression}=${total}${request.difficulty !== null ? ` ${total > request.difficulty ? '>' : total < request.difficulty ? '<' : '='} 难度${request.difficulty}` : ''}`];
   if (hints) {
     const resources = [];
@@ -84,7 +89,7 @@ export function formatRoll(result, name, hints = true) {
 export function formatSettlement(before, after, fearBefore, fearAfter, effects) {
   const fields = [];
   const change = (label, a, b, cap) => a === b ? `${label}${b}/${cap}` : `${label}${a}→${b}`;
-  if (effects.hopeGain) fields.push(change('希望', before.希望, after.希望, 6));
+  if (effects.hopeGain || effects.hopeSpend) fields.push(change('希望', before.希望, after.希望, 6));
   if (effects.stressClear) fields.push(before.压力 === after.压力 ? `压力${after.压力}` : `压力${before.压力}→${after.压力}`);
   if (effects.fearGain) fields.push(change('恐惧', fearBefore, fearAfter, 12));
   return fields.join(' ｜ ');
