@@ -39,11 +39,11 @@ npm run test:pbdh-embed
 
 iframe 中使用完整 PbDH Platform Shell，账号、云存档和系统包声明的格式导入均复用原有入口。点击右上角“账号”登录；840px 下，“玩家存档 / 导入导出”位于右上角“主页面”菜单。切换或导入新人物后重新确认 Dice 关联。跑团数值覆盖仍不会写进本地/云存档。
 
-本地前端必须连接 PbDH Backend，不能只启动静态预览。开发和预览可用环境变量 `PBDH_API_PROXY_TARGET` 指定 API 后端，未设置时仍为 `http://127.0.0.1:8001`。此实验使用 18762 前端和 18763 独立后端，数据库位于忽略的本地 runtime，登录使用既有公开 Supabase 配置；这里的“云”是独立实验数据库，不包含线上已有存档。正式部署继续使用同源 `/api` 与正常 PbDH 后端，即可访问原有云存档，无需新账号或存档协议。
+本地前端必须连接 PbDH Backend，不能只启动静态预览。开发和预览可用环境变量 `PBDH_API_PROXY_TARGET` 指定 API 后端，未设置时仍为 `http://127.0.0.1:8001`。当前按用户要求，18762 前端使用 `PBDH_API_PROXY_TARGET=https://daggerheart.cn` 连接正常 PbDH API，代理改写 Host 并正常校验 HTTPS 证书。Supabase 负责认证，账号资料、原有云存档与托管图片来自正式 PbDH 后端；不会再读取 18763 的实验账号资料。仅修改本地预览连接，无需部署服务器、新账号或存档协议。原 18763 隔离后端只供合成数据验收，写入/回收脚本必须直接指向该端口，不得通过已接云端的 18762 执行。PbDH 单活动会话提示仍按原有流程处理。
 
 ## 本地双端预览
 
-PbDH 工作树：`npm install`，按其 AGENTS.md 运行 `npm run verify`（包含 `apps/platform/dist` 构建）。以下协议夹具只做静态界面/SDK 验收，不提供 Backend；账号/云存档试用另接 18763 实验后端，不需重启其他路线的开发服务。
+PbDH 工作树：`npm install`，按其 AGENTS.md 运行 `npm run verify`（包含 `apps/platform/dist` 构建）。以下协议夹具只做静态界面/SDK 验收，不提供 Backend；账号/云存档试用通过 18762 代理正常 PbDH API，不需重启其他路线的开发服务。
 
 Seal 工作树：
 
@@ -64,6 +64,6 @@ npm run preview:pbdh-embed -- "D:\path\to\PbDH\apps\platform\dist" "D:\path\to\r
 - 资源修改会留下普通聊天消息。最大值在实验模式只读，使用既有显式导入/命令配置。不新增宿主补丁来绕过限制。
 - 协议fixture / 单元测试 / 静态构建通过只证明自有代码和固定 SDK 通信。上线前仍需未修改官方Chat/Dice的隔离真实联动，用户明确要求才发布或部署。
 
-当前验收：PbDH `npm run verify` 通过（1435 项前端测试、178 项 Python 测试、边界/契约/类型检查和构建）；sealpack 41、原生卡 21、iForm 配置 2 项测试通过，固定参考清单一致。官方未修改 Chat 20260921 / Dice 1.6.1 本地实例已运行，`zac/daggerheart` 0.4.7 已启用；真实 iForm 读取活动卡，默认 840px，拖宽到 1040px 时 iframe 跟随，原有窄屏布局把桌面放到下方。同源 fixture 验证标题 🎲 位置、现有力量格点击、Dice 零特质显示、优势/反应/经历/DC/原因的单条 SDK 消息发送，以及格式化武器摘要默认值、三输入手改与完整 `.r` 指令一致；夹具只记录投骰请求，不冒充真实扣费结算。账号页面已使用项目测试账号登录验收；通过前端 API 代理完成独立后端云人物存档创建、读取、更新、列表查询与回收，未访问生产存档。伤害助手页面已确认武器名预览。生产未部署；完整真实人物操作、经历费用和回复回读仍需本地试用验收。
+当前验收：PbDH `npm run verify` 通过（1435 项前端测试、178 项 Python 测试、边界/契约/类型检查和构建）；sealpack 41、原生卡 21、iForm 配置 2 项测试通过，固定参考清单一致。官方未修改 Chat 20260921 / Dice 1.6.1 本地实例已运行，`zac/daggerheart` 0.4.7 已启用；真实 iForm 读取活动卡，默认 840px，拖宽到 1040px 时 iframe 跟随，原有窄屏布局把桌面放到下方。同源 fixture 验证标题 🎲 位置、现有力量格点击、Dice 零特质显示、优势/反应/经历/DC/原因的单条 SDK 消息发送，以及格式化武器摘要默认值、三输入手改与完整 `.r` 指令一致；夹具只记录投骰请求，不冒充真实扣费结算。账号页面与正式云端连接已验收：显示正式账号资料，读取已有云人物存档及其七张卡牌图片；未做云文档写入或回收测试。合成数据创建/读取/更新/列表/回收仅在隔离后端验收。伤害助手页面已确认武器名预览。生产未部署；完整真实人物操作、经历费用和回复回读仍需本地试用验收。
 
 助手交互只读核对了当前 [SealChat master 的 DiceRollPopover.vue](https://github.com/kagangtuya-star/sealchat/blob/7a7b5bb424ae08e4954a2078833b172dbac847b7/ui/src/views/chat/components/character-sheet/DiceRollPopover.vue)（核对时 master 即固定版本 7a7b5bb），以及本项目 master 的原生匕首之心卡。自有实现用 `.dd/.ddr adv/dis`，保留匕首之心经历协议；不复制或修改宿主组件。
