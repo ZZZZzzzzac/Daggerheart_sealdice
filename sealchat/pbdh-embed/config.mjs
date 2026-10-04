@@ -1,4 +1,4 @@
-export const capabilities = ['context.read', 'characterCard.read', 'messages.send'];
+export const capabilities = ['context.read', 'characters.read', 'characterCard.read', 'messages.send'];
 // 210mm ≈ 794 CSS px，加两侧留白和滚动条；保持在 PbDH 1080px 窄屏断点内。
 export const presentation = { defaultWidth: 840, defaultHeight: 790, defaultFloating: true };
 

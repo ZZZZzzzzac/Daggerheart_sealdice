@@ -27,10 +27,12 @@ Dice 结算或聊天资源命令的确认结果通过 Runtime.updateModuleValue 
 
 ## iForm 配置与静态验收
 
-npm run build:pbdh-embed -- https://your-pbdh.example/pbdh/player/daggerheart-core 生成 iframe.html、bridge-policy.json、presentation.json。宿主配置必须为直接外部 iframe，开启 Embed API 并授予 context.read、characterCard.read、messages.send；hostOrigin/sdkUrl 由宿主注入并校验同源。默认浮窗840×790，iframe随拖动缩放，沿用 PbDH 窄屏模式将桌面移到下方。
+npm run build:pbdh-embed -- https://your-pbdh.example/pbdh/player/daggerheart-core 生成 iframe.html、bridge-policy.json、presentation.json。宿主配置必须为直接外部 iframe，开启 Embed API 并授予 context.read、characters.read、characterCard.read、messages.send；hostOrigin/sdkUrl 由宿主注入并校验同源。默认浮窗840×790，iframe随拖动缩放，沿用 PbDH 窄屏模式将桌面移到下方。
 
 npm run preview:pbdh-embed -- <PbDH apps/platform/dist> <固定官方SDK路径> 提供隔离 SDK 协议夹具，--same-origin 仅供浏览器工具验收。夹具初始化与步进模拟资源保存，只记录投骰请求，不冒充真实掷骰或扣费，不接正式云端。
 
-切换身份、频道、卡名/类型、存档或来源标识，以及断线，均停止关联。官方接口缺少稳定 Dice 卡 ID、原子 expectedCardId 和属性版本比较；初始化与 .st 调整没有严格外部并发保证，已经发送的消息不能撤销。读卡与约10秒轮询用于资源确认，超时/未知请求不自动重发。
+未标记规则类型的活动卡允许显式关联；实验 .dh pbdh 在资源写入前仍校验当前群规则为 daggerheart，未启用时在聊天发送 .set dh 后重试。原生 .st 将空类型补成 daggerheart/dh 时保持关联，已有其他规则类型的卡拒绝初始化。登录、断线、发送权限、卡规则类型和 SDK 授权分别显示具体提示。characters.read 用于读取当前消息身份并在切换时停止旧草稿；官方 characterCard.getCurrent 读取当前账号的 Dice 活动卡，场内/场外角色并不各自创建独立 Dice 卡。
+
+切换身份、频道、卡名、其他规则类型、存档或来源标识，以及断线，均停止关联。官方接口缺少稳定 Dice 卡 ID、原子 expectedCardId 和属性版本比较；初始化与 .st 调整没有严格外部并发保证，已经发送的消息不能撤销。读卡与约10秒轮询用于资源确认，超时/未知请求不自动重发。
 
 测试与部署：专用初始化协议已补充零资源、完整姓名、非法字段拒绝与回读确认测试，并用未修改的官方1.6.1验证 .st show、数值公式、费用、来源和重载。本地实验需先安装0.4.9，再加载新版 PbDH iframe。正式云端仍沿用现有存档和认证流程，不创建或回收合成云文档；未部署或发布到生产。

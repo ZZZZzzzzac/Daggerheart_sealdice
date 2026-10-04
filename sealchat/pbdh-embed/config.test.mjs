@@ -11,7 +11,7 @@ test('single direct iframe with only required capabilities, no nested srcdoc or 
   assert.doesNotMatch(result.iframe, /width:1100px|max-width:/);
   assert.deepEqual(result.presentation, { defaultWidth: 840, defaultHeight: 790, defaultFloating: true });
   assert.doesNotMatch(result.iframe, /srcdoc|<script|token|UPDATE_ATTRS/);
-  assert.deepEqual(result.bridgePolicy, { enabled: true, allowedOrigins: ['https://daggerheart.cn'], capabilities: ['context.read', 'characterCard.read', 'messages.send'] });
+  assert.deepEqual(result.bridgePolicy, { enabled: true, allowedOrigins: ['https://daggerheart.cn'], capabilities: ['context.read', 'characters.read', 'characterCard.read', 'messages.send'] });
 });
 
 test('unsafe locations and preconfigured SDK are rejected', () => {
