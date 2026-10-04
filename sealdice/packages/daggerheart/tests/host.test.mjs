@@ -17,7 +17,7 @@ function host(initial = {}, shared = new Map()) {
     const inner=expr.slice(1,-1).trim();
     const values={ '+2':2, 敏捷:attrs(u,g).get('敏捷') ?? 0 };
     const combination=/^\((敏捷|0|\+2)\)\+\((-?\d+)\)$/.exec(inner);
-    const v=combination ? (combination[1]==='0' ? 0 : values[combination[1]])+Number(combination[2]) : Object.prototype.hasOwnProperty.call(values,inner)?values[inner]:null;
+    const v=combination ? (combination[1]==='0' ? 0 : values[combination[1]])+Number(combination[2]) : Object.prototype.hasOwnProperty.call(values,inner)?values[inner]: /^-?\d+(?:[+-]\d+)*$/.test(inner) ? inner.match(/[+-]?\d+/g).reduce((sum,n)=>sum+Number(n),0) : null;
     return { toJSON: () => Array.from(new TextEncoder().encode(JSON.stringify({t:0,v}))) };
   }, player: { userId: u, name: '玩家' }, group: { groupId: g }, endPoint: { userId: 'SEALCHAT:BOT' }, privilegeLevel: privilege });
   const data = ctx => attrs(ctx.player.userId, ctx.group.groupId);
@@ -175,4 +175,28 @@ test('archive includes only native package files and optional fields have no def
     assert.doesNotMatch(yaml,new RegExp(`^    ${field}: [0-9]`,'m'));
   }
   new vm.Script(strFromU8(zip['scripts/daggerheart.js']));
+});
+
+const pbdhId = '01234567-89ab-4cde-8fab-0123456789ab';
+test('iframe numeric modifiers and explicit fee do not read persisted traits or experiences',()=>{
+  const h=host({力量:99,希望:2,压力:2,DHPbDH来源:pbdhId,DH角色标识:'iframe-role',DH经历:'invalid old data'});
+  h.dice(8,3);h.run('dd',['3+2','hope=1','pbdh='+pbdhId,'--','知识 · 经历']);
+  assert.equal(h.rolls,2);assert.equal(h.attrs().get('希望'),2);assert.equal(h.attrs().get('DH经历'),'invalid old data');
+  assert.match(h.replies.at(-1),/\(3\+2\)\[5\]/);assert.match(h.replies.at(-1),/希望消耗1/);
+});
+test('iframe fee insufficiency or wrong source rejects before dice or writes',()=>{
+  for (const initial of [{希望:0,DHPbDH来源:pbdhId},{希望:3,DHPbDH来源:'other'},{希望:3}]) {
+    const h=host(initial);const before=JSON.stringify([...h.attrs()]);h.run('dd',['0','hope=1','pbdh='+pbdhId]);
+    assert.equal(h.rolls,0);assert.equal(JSON.stringify([...h.attrs()]),before);
+  }
+});
+test('iframe explicit fee uses existing recovery and duplicate receipts across reload',()=>{
+  const h=host({希望:3,压力:2,DHPbDH来源:pbdhId});const args=['0','hope=2','pbdh='+pbdhId];
+  h.fail('SEALCHAT:P','压力');h.run('dd',args,{id:'iframe-paid'});assert.match(h.replies.at(-1),/保存失败/);
+  assert.equal(h.attrs().get('希望'),2);const rolls=h.rolls;h.reload();h.run('dh',['recover']);
+  assert.equal(h.attrs().get('希望'),2);assert.equal(h.attrs().get('压力'),1);assert.equal(h.rolls,rolls);
+  h.run('dd',args,{id:'iframe-paid'});assert.equal(h.attrs().get('希望'),2);assert.equal(h.rolls,rolls);
+});
+test('resource mirror maximum is respected while plain Dice defaults remain compatible',()=>{
+  const h=host({希望:8,希望上限:8,DH角色标识:'iframe-role'});h.run('dd',[]);assert.equal(h.attrs().get('希望'),8);assert.equal(h.rolls,2);assert.match(h.replies.at(-1),/希望8\/8/);
 });

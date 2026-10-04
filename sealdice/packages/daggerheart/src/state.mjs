@@ -2,11 +2,11 @@ export function bounded(value, maximum, label) {
   if (!Number.isSafeInteger(value) || value < 0 || value > maximum) throw new Error(`${label}必须是0–${maximum}的整数`);
   return value;
 }
-export function settleOptional(values, effects, fear) {
+export function settleOptional(values, effects, fear, hopeMaximum = 6) {
   const next = { ...values };
   if (effects.hopeGain) {
-    bounded(next.希望, 6, '希望');
-    next.希望 = Math.min(6, next.希望 + effects.hopeGain);
+    bounded(next.希望, hopeMaximum, '希望');
+    next.希望 = Math.min(hopeMaximum, next.希望 + effects.hopeGain);
   }
   if (effects.stressClear) next.压力 = Math.max(0, bounded(next.压力, Number.MAX_SAFE_INTEGER, '压力') - effects.stressClear);
   if (effects.fearGain) fear = Math.min(12, bounded(fear, 12, 'GM恐惧') + effects.fearGain);

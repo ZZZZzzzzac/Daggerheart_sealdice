@@ -42,10 +42,11 @@ window.addEventListener('message', e => {
       else if (req.method === 'messages.send') {
         if (!connected || req.params.identityId !== context().currentCharacter.id) throw Error('PERMISSION_DENIED');
         const match = /^\.st (生命上限|压力上限|护甲上限|希望上限|生命|压力|护甲|希望|金币把|金币袋|金币箱)([+-])1$/.exec(req.params.text);
-        const assign = /^\.st (敏捷|力量|灵巧|本能|风度|知识|闪避|护甲上限|重伤阈值|严重阈值)=([+-]?\d+)$/.exec(req.params.text);
-        if (!match && !assign && !/^\.(?:ddr?|r)(?: |$)/.test(req.params.text)) throw Error('INVALID_PARAMS');
+        const resourceNames = ['生命','生命上限','压力','压力上限','护甲','护甲上限','希望','希望上限','金币把','金币袋','金币箱','DHPbDH来源'];
+        const assignments = !match && req.params.text.startsWith('.st ') ? req.params.text.slice(4).split(' ').map(token => /^([^=]+)=("[a-f0-9-]+"|\d+)$/.exec(token)) : [];
+        if (!match && !(assignments.length && assignments.every(item => item && resourceNames.includes(item[1]))) && !/^\.(?:ddr?|r)(?: |$)/.test(req.params.text)) throw Error('INVALID_PARAMS');
         if (match) { const key = match[1], delta = match[2] === '+' ? 1 : -1; cards[active].attrs[key] += delta; }
-        if (assign) cards[active].attrs[assign[1]] = Number(assign[2]);
+        for (const item of assignments) cards[active].attrs[item[1]] = item[2].startsWith('"') ? JSON.parse(item[2]) : Number(item[2]);
         // 只记录投骰请求，不伪装为实际 Dice 掷骰或费用结算。
         sent.push(req.params.text); render(); result = { id: crypto.randomUUID() };
       } else throw Error('CAPABILITY_DENIED');

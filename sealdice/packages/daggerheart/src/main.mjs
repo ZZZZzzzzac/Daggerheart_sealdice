@@ -4,10 +4,11 @@ import { bounded, settleOptional, parseGroupState } from './state.mjs';
 import {EXPERIENCE_FIELD, encodeExperiences, readExperiences, selectedExperiences} from './experiences.mjs';
 import {characterSummary} from './fields.mjs';
 
-const VERSION = '0.4.7';
-const HELP = `.dd [算式] [adv/dis] [dc难度] [-- 原因]
+const VERSION = '0.4.8';
+const HELP = `.dd [算式] [adv/dis] [dc难度] [hope=费用] [-- 原因]
 例：.dd 敏捷+2+2d6k1 adv dc15 -- 攀爬
 .dd：动作掷骰；.ddr：反应掷骰；人物卡可勾选经历，每项消耗1希望。
+iframe 可直接传入数值公式与 hope=费用，不要求保存经历。
 .st：属性与资源；.dh exp：经历；.dh gm：指定GM。`;
 const GM_HELP = `.dh gm claim：自己担任GM
 .dh gm set 用户ID：指定GM；.dh gm clear：卸任
@@ -80,30 +81,32 @@ function recover(ctx) {
 function doRoll(ctx, msg, args, reaction) {
   const request = parseRequest(args, reaction);
   return mutation(ctx, msg, state => {
-    const experiences = selectedExperiences(read(ctx, EXPERIENCE_FIELD, 'str'), request.experiences);
-    const cost = experiences.length;
-    const hope = !reaction || cost ? optional(ctx, '希望', 6) : null;
+    if (request.pbdh && read(ctx, 'DHPbDH来源', 'str') !== request.pbdh) throw Error('PbDH 关联已变化，请重新关联后掷骰');
+    const experiences = request.experiences ? selectedExperiences(read(ctx, EXPERIENCE_FIELD, 'str'), request.experiences) : [];
+    const cost = request.hopeCost ?? experiences.length;
+    const hopeMaximum = !reaction || cost ? optional(ctx, '希望上限', 60) ?? 6 : 6;
+    const hope = !reaction || cost ? optional(ctx, '希望', hopeMaximum) : null;
     if (cost && (hope === null || hope < cost)) throw Error(`希望不足：使用${cost}项经历需要${cost}点希望`);
-    if (cost) request.expression = `(${request.expression || '0'})+(${experiences.reduce((sum,item) => sum + item.modifier,0)})`;
+    if (experiences.length) request.expression = `(${request.expression || '0'})+(${experiences.reduce((sum,item) => sum + item.modifier,0)})`;
     const stress = !reaction ? optional(ctx, '压力', Number.MAX_SAFE_INTEGER) : null;
     const gm = !reaction && state.gm && !ctx.isPrivate && ctx.group?.groupId ? target(ctx, state.gm) : null;
     const fear = gm ? optional(gm, '恐惧', 12) ?? 0 : null;
     const result = rollRequest(request, sides => Math.floor(Math.random() * sides) + 1, expression => evaluateNative(ctx, expression));
     const effects = { ...result.effects, hopeGain: hope === null ? 0 : result.effects.hopeGain,
       stressClear: stress === null ? 0 : result.effects.stressClear, fearGain: gm ? result.effects.fearGain : 0 };
-    const before = { 希望: hope, 压力: stress }, next = settleOptional({...before, 希望:hope === null ? null : hope - cost}, effects, fear);
+    const before = { 希望: hope, 压力: stress }, next = settleOptional({...before, 希望:hope === null ? null : hope - cost}, effects, fear, hopeMaximum);
     const values = {};
     if (cost || effects.hopeGain) values.希望 = next.values.希望;
     if (effects.stressClear) values.压力 = next.values.压力;
     const writes = changes(ctx, values);
     if (effects.fearGain) writes.push(...changes(gm, { 恐惧: next.fear }));
-    const summary = formatSettlement(before, next.values, fear, next.fear, {...effects, hopeSpend:cost});
+    const summary = formatSettlement(before, next.values, fear, next.fear, {...effects, hopeSpend:cost}, hopeMaximum);
     const manual = [];
     if (result.effects.hopeGain && hope === null) manual.push('希望+1');
     if (result.effects.stressClear && stress === null) manual.push('压力-1');
     if (result.effects.fearGain && !gm) manual.push('恐惧+1');
     const tail = [summary, manual.length ? `手动：${manual.join('、')}` : ''].filter(Boolean).join(' ｜ ');
-    const experienceText = cost ? '\n经历：' + experiences.map(item => item.name + '(' + (item.modifier >= 0 ? '+' : '') + item.modifier + ')').join('、') + ` ｜ 希望消耗${cost}` : '';
+    const experienceText = experiences.length ? '\n经历：' + experiences.map(item => item.name + '(' + (item.modifier >= 0 ? '+' : '') + item.modifier + ')').join('、') + ` ｜ 希望消耗${cost}` : cost ? `\n经历修正已计入公式 ｜ 希望消耗${cost}` : '';
     return { writes, reply: formatRoll(result, ctx.player.name, false) + experienceText + (tail ? '\n' + tail : '') };
   });
 }

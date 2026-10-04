@@ -13,6 +13,14 @@ export function parseRequest(args, reaction = false) {
     if (!depth && !quote && raw.startsWith('exp=')) {
       if (request.experiences) throw Error('经历只能选择一次');
       request.experiences = parseExperienceToken(raw);
+    } else if (!depth && !quote && raw.startsWith('hope=')) {
+      if (request.hopeCost !== undefined) throw Error('希望费用只能指定一次');
+      if (!/^hope=[0-5]$/.test(raw)) throw Error('希望费用须为0–5的整数');
+      request.hopeCost = Number(raw.slice(5));
+    } else if (!depth && !quote && raw.startsWith('pbdh=')) {
+      if (request.pbdh) throw Error('PbDH 关联只能指定一次');
+      if (!/^pbdh=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(raw)) throw Error('PbDH 存档标识无效');
+      request.pbdh = raw.slice(5);
     } else if (!depth && !quote && (match = /^(adv|优势|优|dis|劣势|劣)(\d*)$/i.exec(raw))) {
       const count = Number(match[2] || 1);
       if (!Number.isSafeInteger(count) || count < 1 || count > 20) throw new Error('优劣势来源数须为1–20');
@@ -36,6 +44,7 @@ export function parseRequest(args, reaction = false) {
       }
     }
   }
+  if (request.experiences && request.hopeCost !== undefined) throw Error('经历编号与希望费用不能同时指定');
   request.expression = parts.join(' ').trim();
   return request;
 }
@@ -86,10 +95,10 @@ export function formatRoll(result, name, hints = true) {
   }
   return lines.join('\n');
 }
-export function formatSettlement(before, after, fearBefore, fearAfter, effects) {
+export function formatSettlement(before, after, fearBefore, fearAfter, effects, hopeMaximum = 6) {
   const fields = [];
   const change = (label, a, b, cap) => a === b ? `${label}${b}/${cap}` : `${label}${a}→${b}`;
-  if (effects.hopeGain || effects.hopeSpend) fields.push(change('希望', before.希望, after.希望, 6));
+  if (effects.hopeGain || effects.hopeSpend) fields.push(change('希望', before.希望, after.希望, hopeMaximum));
   if (effects.stressClear) fields.push(before.压力 === after.压力 ? `压力${after.压力}` : `压力${before.压力}→${after.压力}`);
   if (effects.fearGain) fields.push(change('恐惧', fearBefore, fearAfter, 12));
   return fields.join(' ｜ ');
