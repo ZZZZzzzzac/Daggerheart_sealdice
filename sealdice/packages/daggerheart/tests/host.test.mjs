@@ -250,3 +250,24 @@ test('invalid badge fields reject the whole binding before any writes',()=>{
     h.run('dh',rawArgs.split(/\s+/),{rawArgs});assert.equal(JSON.stringify([...h.attrs()]),before);assert.doesNotMatch(h.replies.at(-1),/已关联/);
   }
 });
+
+test('iframe rolls use exactly three lines with labels and fees in their respective rows',()=>{
+  const h=host({希望:2,希望上限:6,压力:3});h.dice(9,5);
+  h.run('dd',['3+2','hope=1','dc15','--','知识','·','旅行者']);
+  const lines=h.replies.at(-1).split('\n');
+  assert.equal(lines.length,3);assert.equal(lines[0],'【玩家】动作掷骰 · 知识 · 旅行者 · 普通');
+  assert.match(lines[1],/希望9\[1d12\]\+恐惧5\[1d12\]\+\(3\+2\)\[5\]=19 > 难度15 ⇒ \*\*✅【希望成功】\*\*$/);
+  assert.equal(lines[2],'资源：希望消耗1 ｜ 希望2/6');
+  assert.equal(h.attrs().get('希望'),2);assert.equal(h.attrs().get('压力'),3);
+  assert.doesNotMatch(h.replies.at(-1),/修正已计入|pbdh=/);
+});
+test('stored experiences move to the first line without changing Hope costs or creating a fourth line',()=>{
+  const items=[{name:'旅行者',modifier:2}];
+  const h=host({希望:3,敏捷:1,[EXPERIENCE_FIELD]:encodeExperiences(items)});h.dice(5,9);
+  h.run('dd',['敏捷',experienceToken([1],experienceRevision(items)),'dc20','--','攀爬']);
+  const lines=h.replies.at(-1).split('\n');
+  assert.equal(lines.length,3);assert.match(lines[0],/敏捷 · 经历：旅行者\(\+2\) · 攀爬 · 普通$/);
+  assert.match(lines[1],/\*\*❌【恐惧失败】\*\*$/);
+  assert.equal(lines[2],'资源：希望消耗1 ｜ 希望3→2 ｜ 手动：恐惧+1');
+  assert.equal(h.attrs().get('希望'),2);
+});

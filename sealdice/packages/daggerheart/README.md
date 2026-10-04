@@ -1,8 +1,10 @@
-# 匕首之心 sealpack · 0.4.7
+# 匕首之心 sealpack · 0.4.12（iframe 本地实验）
 
 属性与资源统一用原生 .st；无需 Chat、.dh init、完整资源或静态上限。
 
 术语统一使用“掷骰”：.dd 为动作掷骰，.ddr 为反应掷骰；掷出武器或能力的伤害骰称为伤害掷骰。本包的二元骰入口用于动作掷骰和反应掷骰，伤害掷骰使用宿主原生 .r 算式。
+
+动作/反应回复分三行：第一行显示人物、类型、属性/经历、优劣势；第二行保留公式和实际二元骰/优劣势出目，在末尾用粗体、图标与方括号突出希望/恐惧及成败；第三行显示费用和资源变化。无难度时成败待定，关键成功优先。经历不另起第四行。
 
 作者：ZZZZzzzzac · 分类：规则扩展（rules） · 许可：[MIT](assets/LICENSE)。
 主页：[GitHub README](https://github.com/ZZZZzzzzac/Daggerheart_sealdice#readme) · 仓库：[Daggerheart_sealdice](https://github.com/ZZZZzzzzac/Daggerheart_sealdice) · 问题反馈：[Issues](https://github.com/ZZZZzzzzac/Daggerheart_sealdice/issues)。
@@ -19,7 +21,7 @@
 
 ## 开始使用
 
-在 SealDice 1.6.1 及以上上传 daggerheart-0.4.7.sealpack，启用并重载包；停用旧同名插件。豹仓安装入口为 [zac/daggerheart](https://repo.sealdice.com/packages?namespace=zac&package=daggerheart)，公开版本不等于当前本地产物。
+在 SealDice 1.6.1 及以上上传 daggerheart-0.4.12.sealpack，启用并重载包；停用旧同名插件。豹仓安装入口为 [zac/daggerheart](https://repo.sealdice.com/packages?namespace=zac&package=daggerheart)，公开版本不等于当前本地产物。
 
 Windows 官方 1.6.1 隔离验收中，禁用并重载后重新启用可能遇到缓存目录重命名 `Access is denied`。遇到此错误时先重启宿主，再重新启用并重载；不修改宿主源码或人物数据。
 

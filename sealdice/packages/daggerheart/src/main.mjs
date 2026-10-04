@@ -5,7 +5,7 @@ import { bounded, settleOptional, parseGroupState } from './state.mjs';
 import {EXPERIENCE_FIELD, encodeExperiences, readExperiences, selectedExperiences} from './experiences.mjs';
 import {characterSummary} from './fields.mjs';
 
-const VERSION = '0.4.11';
+const VERSION = '0.4.12';
 const HELP = `.dd [算式] [adv/dis] [dc难度] [hope=费用] [-- 原因]
 例：.dd 敏捷+2+2d6k1 adv dc15 -- 攀爬
 .dd：动作掷骰；.ddr：反应掷骰；人物卡可勾选经历，每项消耗1希望。
@@ -106,9 +106,8 @@ function doRoll(ctx, msg, args, reaction) {
     if (result.effects.hopeGain && hope === null) manual.push('希望+1');
     if (result.effects.stressClear && stress === null) manual.push('压力-1');
     if (result.effects.fearGain && !gm) manual.push('恐惧+1');
-    const tail = [summary, manual.length ? `手动：${manual.join('、')}` : ''].filter(Boolean).join(' ｜ ');
-    const experienceText = experiences.length ? '\n经历：' + experiences.map(item => item.name + '(' + (item.modifier >= 0 ? '+' : '') + item.modifier + ')').join('、') + ` ｜ 希望消耗${cost}` : cost ? `\n经历修正已计入公式 ｜ 希望消耗${cost}` : '';
-    return { writes, reply: formatRoll(result, ctx.player.name, false) + experienceText + (tail ? '\n' + tail : '') };
+    const tail = [cost ? `希望消耗${cost}` : '', summary, manual.length ? `手动：${manual.join('、')}` : ''].filter(Boolean).join(' ｜ ');
+    return { writes, reply: formatRoll(result, ctx.player.name, false, experiences) + '\n资源：' + (tail || '无变化') };
   });
 }
 function experienceCommand(ctx, args) {

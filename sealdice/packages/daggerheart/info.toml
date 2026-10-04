@@ -3,7 +3,7 @@ format_version = "1.0.0"
 [package]
 id = "zac/daggerheart"
 name = "匕首之心"
-version = "0.4.11"
+version = "0.4.12"
 authors = ["ZZZZzzzzac"]
 license = "MIT"
 description = "《匕首之心》二元骰与原生人物卡规则扩展：.dd / .ddr 掷骰、优劣势、难度比较、希望/压力及 GM 恐惧结算，输入 .dd help 开始使用。"

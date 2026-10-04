@@ -1,6 +1,6 @@
 # PbDH 外部 iForm 实验
 
-独立路线：Seal/sealpack 工作树 codex/pbdh-iframe-sync；PbDH 工作树 codex/sealchat-iframe-sync。本地实验 sealpack 为0.4.11；已发布0.4.7和 PbDH main 均不修改、不发布。SealChat/Dice 使用未修改的官方二进制，不补丁、不重新编译宿主。
+独立路线：Seal/sealpack 工作树 codex/pbdh-iframe-sync；PbDH 工作树 codex/sealchat-iframe-sync。本地实验 sealpack 为0.4.12；已发布0.4.7和 PbDH main 均不修改、不发布。SealChat/Dice 使用未修改的官方二进制，不补丁、不重新编译宿主。
 
 ## 数据职责
 

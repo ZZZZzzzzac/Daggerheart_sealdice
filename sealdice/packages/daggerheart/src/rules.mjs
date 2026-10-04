@@ -1,4 +1,5 @@
 import {parseExperienceToken} from './experiences.mjs';
+import {canonicalField} from './fields.mjs';
 // Only .dd options are parsed here; arithmetic belongs to the host .r engine.
 export function parseRequest(args, reaction = false) {
   if (args.length > 80 || args.join(' ').length > 1000) throw new Error('指令过长');
@@ -75,23 +76,30 @@ export function rollRequest(request, rollDie, evaluateExpression = () => ({ valu
   return { request, hope, fear, expression: evaluated.expression || request.expression, modifier, advantage, total, critical, withHope, success, effects };
 }
 
-export function formatRoll(result, name, hints = true) {
+export function formatRoll(result, name, hints = true, experiences = []) {
   const { request, hope, fear, total, critical, withHope, success, advantage, modifier, effects } = result;
-  const outcome = critical ? '关键成功' : request.reaction
-    ? (success === null ? '待定' : success ? '成功' : '失败')
-    : `${withHope ? '希望' : '恐惧'}${success === null ? '' : success ? '成功' : '失败'}`;
-  // 海豹注解携带实际面值，供 SealChat 的公开机器人回复解析器生成 3D 骰子。
+  const polarity = withHope ? '希望' : '恐惧';
+  const outcome = critical ? '✨【关键成功】' : success === null ? `◆【${polarity} · 成败待定】`
+    : `${success ? '✅' : '❌'}【${polarity}${success ? '成功' : '失败'}】`;
+  const traits = [...new Set((request.expression.match(/[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*/g) || [])
+    .map(canonicalField).filter(key => ['敏捷','力量','灵巧','本能','风度','知识'].includes(key)))];
+  const net = request.advantages - request.disadvantages;
+  const edge = net > 0 ? '优势' : net < 0 ? '劣势' : request.advantages ? '优劣势抵消' : '普通';
+  const labels = [`【${name}】${request.reaction ? '反应掷骰' : '动作掷骰'}`, ...traits,
+    experiences.length ? '经历：' + experiences.map(item => item.name + '(' + (item.modifier >= 0 ? '+' : '') + item.modifier + ')').join('、') : '',
+    request.reason, edge].filter(Boolean);
+  // 保留实际面值的海豹注解，供固定 SealChat 公开解析器生成 3D 骰子。
   let expression = `希望${hope}[1d12]+恐惧${fear}[1d12]`;
   if (request.expression) expression += `+(${result.expression})[${modifier}]`;
   if (advantage) expression += `${advantage > 0 ? '+' : '-'}${advantage > 0 ? '优势' : '劣势'}${Math.abs(advantage)}[1d6]`;
-  const lines = [`【${name}】${request.reaction ? '反应掷骰' : '动作掷骰'} · ${outcome}${request.reason ? ` · ${request.reason}` : ''}`,
-    `${expression}=${total}${request.difficulty !== null ? ` ${total > request.difficulty ? '>' : total < request.difficulty ? '<' : '='} 难度${request.difficulty}` : ''}`];
+  const lines = [labels.join(' · '),
+    `${expression}=${total}${request.difficulty !== null ? ` ${total > request.difficulty ? '>' : total < request.difficulty ? '<' : '='} 难度${request.difficulty}` : ''} ⇒ **${outcome}**`];
   if (hints) {
     const resources = [];
     if (effects.hopeGain) resources.push('希望+1');
     if (effects.fearGain) resources.push('恐惧+1');
     if (effects.stressClear) resources.push('压力-1');
-    if (resources.length) lines.push(`手动：${resources.join('、')}`);
+    lines.push(resources.length ? `资源：手动：${resources.join('、')}` : '资源：无变化');
   }
   return lines.join('\n');
 }
