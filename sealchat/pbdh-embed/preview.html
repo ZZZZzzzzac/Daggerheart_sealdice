@@ -3,11 +3,11 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PbDH · SealChat 隔离协议预览</title>
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#f4f4f2;color:#202020}header{padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}header p{margin:0;width:100%}button{padding:6px 10px}iframe{width:100%;height:calc(100vh - 180px);border:0;background:white}pre{margin:0;padding:8px 12px;font-size:12px;max-height:70px;overflow:auto}</style></head>
 <body><header><strong>隔离协议预览 · 官方 SDK + 模拟宿主</strong><p>本页不连接 SealChat、SealDice、生产账号或群聊；消息仅保存在当前预览内存中。</p>
-<button id="external">模拟外部希望 +1</button><button id="roll">模拟检定结算</button><button id="switch">模拟切卡</button><button id="offline">模拟断线 / 恢复</button><button id="close">模拟会话失效</button>
+<button id="reopen">关闭 / 重开 iframe</button><button id="external">模拟外部希望 +1</button><button id="roll">模拟检定结算</button><button id="switch">模拟切卡</button><button id="offline">模拟断线 / 恢复</button><button id="close">模拟会话失效</button>
 <span id="summary"></span></header><pre id="messages">尚未发送指令</pre>
 <iframe id="player" title="PbDH 实验人物卡" sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups" referrerpolicy="no-referrer"></iframe>
 <script>
-const frame = document.getElementById('player');
+let frame = document.getElementById('player');
 const playerUrl = new URL('__PLAYER_URL__');
 playerUrl.searchParams.set('sealchat', '1');
 playerUrl.searchParams.set('hostOrigin', location.origin);
@@ -66,6 +66,10 @@ window.addEventListener('message', e => {
   channel.port1.start();
   e.source.postMessage({ type: 'sealchat.embed.handshake.ack', version: 1, nonce: e.data.nonce, ok: true, sessionId, contextVersion, capabilities }, e.origin, [channel.port2]);
 });
+document.getElementById('reopen').onclick = () => {
+  for (const port of sessions.values()) port.close(); sessions.clear();
+  const next = frame.cloneNode(false); next.removeAttribute("src"); frame.replaceWith(next); frame = next; frame.src = playerUrl.href;
+};
 document.getElementById('external').onclick = () => { cards[active].attrs.希望 = Math.min(6, cards[active].attrs.希望 + 1); render(); };
 document.getElementById('roll').onclick = () => { cards[active].attrs.希望 = Math.min(6, cards[active].attrs.希望 + 1); cards[active].attrs.压力 = 0; render(); };
 document.getElementById('switch').onclick = () => { active = 1 - active; companionEvents(); };
