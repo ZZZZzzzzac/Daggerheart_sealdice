@@ -43,8 +43,17 @@ window.addEventListener('message', e => {
         if (!connected || req.params.identityId !== context().currentCharacter.id) throw Error('PERMISSION_DENIED');
         const match = /^\.st (生命上限|压力上限|护甲上限|希望上限|生命|压力|护甲|希望|金币把|金币袋|金币箱)([+-])1$/.exec(req.params.text);
         const resourceNames = ['生命','生命上限','压力','压力上限','护甲','护甲上限','希望','希望上限','金币把','金币袋','金币箱','DHPbDH来源'];
+        let binding = null;
+        if (req.params.text.startsWith('.dh pbdh ')) {
+          binding = JSON.parse(decodeURIComponent(req.params.text.slice(9)));
+          if (typeof binding.name !== 'string' || !binding.name.trim() || typeof binding.source !== 'string'
+              || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(binding.source)
+              || Object.keys(binding.values).length !== 11
+              || !resourceNames.slice(0,11).every(key => Object.hasOwn(binding.values,key) && Number.isSafeInteger(binding.values[key]) && binding.values[key] >= 0)) throw Error('INVALID_PARAMS');
+        }
         const assignments = !match && req.params.text.startsWith('.st ') ? req.params.text.slice(4).split(' ').map(token => /^([^=]+)=("[a-f0-9-]+"|\d+)$/.exec(token)) : [];
-        if (!match && !(assignments.length && assignments.every(item => item && resourceNames.includes(item[1]))) && !/^\.(?:ddr?|r)(?: |$)/.test(req.params.text)) throw Error('INVALID_PARAMS');
+        if (!binding && !match && !(assignments.length && assignments.every(item => item && resourceNames.includes(item[1]))) && !/^\.(?:ddr?|r)(?: |$)/.test(req.params.text)) throw Error('INVALID_PARAMS');
+        if (binding) Object.assign(cards[active].attrs,binding.values,{DHPbDH来源:binding.source,DHPbDH姓名:binding.name});
         if (match) { const key = match[1], delta = match[2] === '+' ? 1 : -1; cards[active].attrs[key] += delta; }
         for (const item of assignments) cards[active].attrs[item[1]] = item[2].startsWith('"') ? JSON.parse(item[2]) : Number(item[2]);
         // 只记录投骰请求，不伪装为实际 Dice 掷骰或费用结算。

@@ -1,3 +1,4 @@
+import { readPbDHBinding, PBDH_SOURCE, PBDH_NAME } from './pbdh.mjs';
 import { parseRequest, rollRequest, formatRoll, formatSettlement } from './rules.mjs';
 import { evaluateNative } from './expression.mjs';
 import { bounded, settleOptional, parseGroupState } from './state.mjs';
@@ -126,7 +127,26 @@ function experienceCommand(ctx, args) {
   seal.vars.strSet(ctx,EXPERIENCE_FIELD,value);
   return `经历已写入当前人物卡（${readExperiences(value).length}项）`;
 }
+function pbDHCommand(ctx, args) {
+  if (args.length !== 2) throw Error('请在 PbDH iframe 中关联当前人物');
+  if (read(ctx,'$t游戏模式','str') !== 'daggerheart') throw Error('请先执行 .set dh');
+  if (load(ctx).pending) throw Error('上次操作未完成，请先执行 .dh recover');
+  const payload = readPbDHBinding(args[1]);
+  // Player.Name 是官方 Goja 公开的角色昵称；不访问人物卡管理器或改写绑卡元数据。
+  if (!ctx.player || (ctx.group && typeof ctx.group.markDirty !== 'function')) throw Error('当前宿主不支持人物昵称保存');
+  for (const [key,value] of Object.entries(payload.values)) seal.vars.intSet(ctx,key,value);
+  ctx.player.name = payload.name;
+  ctx.player.updatedAtTime = Math.floor(Date.now()/1000);
+  if (ctx.group) ctx.group.markDirty(ctx.dice);
+  seal.vars.strSet(ctx,'$t玩家', '<'+payload.name+'>');
+  seal.vars.strSet(ctx,'$t玩家_RAW',payload.name);
+  seal.vars.strSet(ctx,PBDH_NAME,payload.name);
+  // 最后写入来源；只有姓名和所有资源均回读一致，iframe 才确认关联。
+  seal.vars.strSet(ctx,PBDH_SOURCE,payload.source);
+  return 'PbDH 已关联：'+payload.name+'；资源已初始化';
+}
 function gmCommand(ctx, msg, args) {
+  if (args[0] === 'pbdh') return pbDHCommand(ctx,args);
   if (args[0] === 'exp') return experienceCommand(ctx,args);
   if (args[0] === 'recover' && args.length === 1) return recover(ctx);
   if (ctx.isPrivate || !ctx.group?.groupId) throw new Error('请在群聊中指定GM');
@@ -158,7 +178,7 @@ function register(name, help, execute) {
       const result = seal.ext.newCmdExecuteResult(true); result.showHelp = true; return result;
     }
     try {
-      const maxLength = name === 'dh' && args[0] === 'exp' ? 4096 : 1000;
+      const maxLength = name === 'dh' && ['exp','pbdh'].includes(args[0]) ? 4096 : 1000;
       if (args.length > 80 || args.join(' ').length > maxLength) throw new Error('指令过长');
       if (cmdArgs.kwargs?.length) throw new Error('原因前加独立的 --');
       if (Array.from(cmdArgs.at || []).some(at => at.userId !== ctx.endPoint?.userId)) throw new Error('请用自己的角色掷骰');

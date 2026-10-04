@@ -19,7 +19,7 @@ function host(initial = {}, shared = new Map()) {
     const combination=/^\((敏捷|0|\+2)\)\+\((-?\d+)\)$/.exec(inner);
     const v=combination ? (combination[1]==='0' ? 0 : values[combination[1]])+Number(combination[2]) : Object.prototype.hasOwnProperty.call(values,inner)?values[inner]: /^-?\d+(?:[+-]\d+)*$/.test(inner) ? inner.match(/[+-]?\d+/g).reduce((sum,n)=>sum+Number(n),0) : null;
     return { toJSON: () => Array.from(new TextEncoder().encode(JSON.stringify({t:0,v}))) };
-  }, player: { userId: u, name: '玩家' }, group: { groupId: g }, endPoint: { userId: 'SEALCHAT:BOT' }, privilegeLevel: privilege });
+  }, player: { userId: u, name: '玩家' }, group: { groupId: g, markDirty() {} }, endPoint: { userId: 'SEALCHAT:BOT' }, privilegeLevel: privilege });
   const data = ctx => attrs(ctx.player.userId, ctx.group.groupId);
   const sandbox = { Math: Object.assign(Object.create(Math), { random: () => { rolls++; return ((dice.shift() ?? 2) - 0.5) / 12; } }),
     seal: { ext: { new: () => ({ cmdMap: {}, storageGet: k => shared.get(k) || '', storageSet: (k,v) => shared.set(k,v) }),
@@ -199,4 +199,21 @@ test('iframe explicit fee uses existing recovery and duplicate receipts across r
 });
 test('resource mirror maximum is respected while plain Dice defaults remain compatible',()=>{
   const h=host({希望:8,希望上限:8,DH角色标识:'iframe-role'});h.run('dd',[]);assert.equal(h.attrs().get('希望'),8);assert.equal(h.rolls,2);assert.match(h.replies.at(-1),/希望8\/8/);
+});
+
+const binding = {source:'10685716-e3e7-4a46-9fbc-0361dfefa196',name:'汉妮 - Hope "旅者"',values:{生命:0,生命上限:7,压力:0,压力上限:6,护甲:0,护甲上限:5,希望:2,希望上限:6,金币把:1,金币袋:0,金币箱:0}};
+test('iframe binding bypasses st name syntax, preserves zero and only initializes allowed fields',()=>{
+  const h=host({力量:99,DH经历:'old'});
+  h.run('dh',['pbdh',encodeURIComponent(JSON.stringify(binding))]);
+  assert.equal(h.attrs().get('DHPbDH来源'),binding.source);assert.equal(h.attrs().get('DHPbDH姓名'),binding.name);
+  for(const [key,value] of Object.entries(binding.values)) assert.equal(h.attrs().get(key),value);
+  assert.equal(h.attrs().get('力量'),99);assert.equal(h.attrs().get('DH经历'),'old');
+  assert.match(h.replies.at(-1),/PbDH 已关联：汉妮 - Hope "旅者"/);
+});
+test('invalid iframe initialization rejects every field before any resource or nickname write',()=>{
+  for(const bad of [{...binding,source:'broken'}, {...binding,name:'bad\nname'}, {...binding,values:{...binding.values,希望:-1}}, {...binding,values:{...binding.values,金币袋:10}}, {...binding,values:{...binding.values,力量:3}}, {...binding,values:{...binding.values,护甲上限:61}}]) {
+    const h=host({希望:4});const before=JSON.stringify([...h.attrs()]);
+    h.run('dh',['pbdh',encodeURIComponent(JSON.stringify(bad))]);assert.equal(JSON.stringify([...h.attrs()]),before);
+    assert.equal(h.rolls,0);assert.doesNotMatch(h.replies.at(-1),/已关联/);
+  }
 });
