@@ -234,3 +234,19 @@ test('readable JSON rejects trailing commands and invalid resources before write
     assert.equal(JSON.stringify([...h.attrs()]),before);assert.equal(h.rolls,0);assert.doesNotMatch(h.replies.at(-1),/已关联/);
   }
 });
+
+test('iframe badge fields initialize through official vars, preserve zero and old bindings',()=>{
+  const payload={...binding,values:{...binding.values,闪避:0,重伤阈值:11,严重阈值:22}};
+  const rawArgs='pbdh '+JSON.stringify(payload), h=host({力量:99,DH经历:'old'});
+  h.run('dh',rawArgs.split(/\s+/),{rawArgs});
+  for(const [key,value] of Object.entries(payload.values)) assert.equal(h.attrs().get(key),value);
+  assert.equal(h.attrs().get('力量'),99);assert.equal(h.attrs().get('DH经历'),'old');assert.match(h.replies.at(-1),/已关联/);
+  h.run('dh',['pbdh',encodeURIComponent(JSON.stringify(binding))]);assert.equal(h.attrs().get('闪避'),0);assert.equal(h.attrs().get('严重阈值'),22);
+});
+test('invalid badge fields reject the whole binding before any writes',()=>{
+  for(const value of [-1,1.5,'11',null,1000001]) for(const field of ['闪避','重伤阈值','严重阈值']) {
+    const payload={...binding,values:{...binding.values,[field]:value}}, h=host({希望:4,闪避:9});
+    const before=JSON.stringify([...h.attrs()]), rawArgs='pbdh '+JSON.stringify(payload);
+    h.run('dh',rawArgs.split(/\s+/),{rawArgs});assert.equal(JSON.stringify([...h.attrs()]),before);assert.doesNotMatch(h.replies.at(-1),/已关联/);
+  }
+});

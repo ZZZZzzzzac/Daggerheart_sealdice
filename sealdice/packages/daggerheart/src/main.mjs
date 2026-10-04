@@ -5,7 +5,7 @@ import { bounded, settleOptional, parseGroupState } from './state.mjs';
 import {EXPERIENCE_FIELD, encodeExperiences, readExperiences, selectedExperiences} from './experiences.mjs';
 import {characterSummary} from './fields.mjs';
 
-const VERSION = '0.4.10';
+const VERSION = '0.4.11';
 const HELP = `.dd [算式] [adv/dis] [dc难度] [hope=费用] [-- 原因]
 例：.dd 敏捷+2+2d6k1 adv dc15 -- 攀爬
 .dd：动作掷骰；.ddr：反应掷骰；人物卡可勾选经历，每项消耗1希望。
@@ -143,7 +143,7 @@ function pbDHCommand(ctx, rawArgs) {
   seal.vars.strSet(ctx,'$t玩家', '<'+payload.name+'>');
   seal.vars.strSet(ctx,'$t玩家_RAW',payload.name);
   seal.vars.strSet(ctx,PBDH_NAME,payload.name);
-  // 最后写入来源；只有姓名和所有资源均回读一致，iframe 才确认关联。
+  // 最后写入来源；只有姓名和所有同步字段均回读一致，iframe 才确认关联。
   seal.vars.strSet(ctx,PBDH_SOURCE,payload.source);
   return 'PbDH 已关联：'+payload.name+'；资源已初始化';
 }

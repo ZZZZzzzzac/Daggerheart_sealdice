@@ -22,7 +22,7 @@ const cards = [
 ];
 const sent = [];
 function context() { return { world: { id: 'preview-world' }, channel: { id: 'preview-channel' }, currentUser: { id: 'preview-user' }, currentCharacter: { id: 'preview-identity-' + active, name: cards[active].name }, connection: { state: connected ? 'connected' : 'offline' }, permissions: { canSendMessage: connected }, capabilities, contextVersion }; }
-function render() { document.getElementById('summary').textContent = cards[active].name + ' · 希望 ' + cards[active].attrs.希望 + ' · ' + (connected ? '已连接' : '断线'); document.getElementById('messages').textContent = sent.length ? sent.join('\n') : '尚未发送指令'; }
+function render() { document.getElementById('summary').textContent = cards[active].name + ' · 希望 ' + cards[active].attrs.希望 + ' · 闪避 ' + (cards[active].attrs.闪避 ?? '未知') + ' · 阈值 ' + (cards[active].attrs.重伤阈值 ?? '未知') + '/' + (cards[active].attrs.严重阈值 ?? '未知') + ' · ' + (connected ? '已连接' : '断线'); document.getElementById('messages').textContent = sent.length ? sent.join('\n') : '尚未发送指令'; }
 function event(topic, payload) { for (const [sessionId, port] of sessions) port.postMessage({ type: 'sealchat.embed.event', version: 1, sessionId, contextVersion, eventId: crypto.randomUUID(), topic, payload, at: Date.now() }); }
 function companionEvents() { contextVersion++; event('context.changed', context()); event('connection.changed', context().connection); render(); }
 window.addEventListener('message', e => {
@@ -42,14 +42,14 @@ window.addEventListener('message', e => {
       else if (req.method === 'messages.send') {
         if (!connected || req.params.identityId !== context().currentCharacter.id) throw Error('PERMISSION_DENIED');
         const match = /^\.st (生命上限|压力上限|护甲上限|希望上限|生命|压力|护甲|希望|金币把|金币袋|金币箱)([+-])1$/.exec(req.params.text);
-        const resourceNames = ['生命','生命上限','压力','压力上限','护甲','护甲上限','希望','希望上限','金币把','金币袋','金币箱','DHPbDH来源'];
+        const resourceNames = ['生命','生命上限','压力','压力上限','护甲','护甲上限','希望','希望上限','金币把','金币袋','金币箱','闪避','重伤阈值','严重阈值','DHPbDH来源'];
         let binding = null;
         if (req.params.text.startsWith('.dh pbdh ')) {
           const raw = req.params.text.slice(9);
           binding = JSON.parse(raw.startsWith('{') ? raw : decodeURIComponent(raw));
           if (typeof binding.name !== 'string' || !binding.name.trim() || typeof binding.source !== 'string'
               || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(binding.source)
-              || Object.keys(binding.values).length !== 11
+              || Object.keys(binding.values).some(key => !resourceNames.slice(0,-1).includes(key) || !Number.isSafeInteger(binding.values[key]) || binding.values[key] < 0)
               || !resourceNames.slice(0,11).every(key => Object.hasOwn(binding.values,key) && Number.isSafeInteger(binding.values[key]) && binding.values[key] >= 0)) throw Error('INVALID_PARAMS');
         }
         const assignments = !match && req.params.text.startsWith('.st ') ? req.params.text.slice(4).split(' ').map(token => /^([^=]+)=("[a-f0-9-]+"|\d+)$/.exec(token)) : [];
