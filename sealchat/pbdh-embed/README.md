@@ -2,7 +2,7 @@
 
 独立路线：Seal 工作树 `codex/pbdh-iframe-sync`；PbDH 工作树 `codex/sealchat-iframe-sync`。目前已合并 Seal master `8d6526c`（sealpack 0.4.7）与 PbDH main `f6261fa`，不包含主工作区未提交内容。本目录不依赖现有 `sealchat/character-sheet`，不修改 SealChat / SealDice 宿主或生产配置。
 
-PbDH 实验前端通过宿主提供的 Channel Embed SDK 接入，四项控件显示 Dice 当前资源及上限；不把会话覆盖存进 PbDH 存档。操作发相对 `.st`，不调用 UPDATE_ATTRS、characterCard.updateAttrs 或 character.set，不上传图片、不用 Embed Storage、不接真实 AI。
+PbDH 实验前端通过宿主提供的 Channel Embed SDK 接入，资源、金币、特质和防御控件显示 Dice 当前数值；不把会话覆盖存进 PbDH 存档。步进发相对 `.st`，显式数值编辑发单字段 `.st field=value`，不调用 UPDATE_ATTRS、characterCard.updateAttrs 或 character.set，不上传图片、不用 Embed Storage、不接真实 AI。
 
 ## 配置现有 iForm
 
@@ -19,15 +19,21 @@ npm run test:pbdh-embed
 2. 启用 Embed API，允许 PbDH 所在 origin，授予 `context.read`、`characterCard.read`、`messages.send`。JSON 只是字段配置参考，不宣称宿主支持文件导入。
 3. 窗口默认宽 840、高 790，iframe 填满官方相对定位容器；拖窗口边缘时内容跟随缩放。840px 宽可容纳约 794px 的 A4，触发 PbDH 原有 1080px 窄屏布局，卡牌桌面位于下方。已有浮窗可能保留旧尺寸，需拖动缩窄或关闭重开。固定版本对单个 iframe 嵌入代码追加 `hostOrigin` / `sdkUrl`；URL-only 分支没有这项注入。PbDH 校验两者一致并从该实例加载 SDK，`/chat/` 前缀由宿主处理。
 4. 在隔离账号/频道启用官方 BOT 人物卡 API、自有 sealpack，先用既有 `.st` 录入资源及上限，选择自己的活动人物卡。
-5. PbDH 中选择对应人物，核对页面显示的 PbDH / Dice 名称，点击“确认关联当前人物卡”。四项余额来自 Dice；未录入字段显示未知且禁用，不填 0。
-6. 点击原有六特质的标签或数值格打开掷骰助手，暂停关联后恢复属性编辑；不改 PbDH 皮肤、布局或独立模式。支持优劣势、反应、修正、难度、原因、经历勾选及手动 `.dd/.ddr` 公式。特质/经历读取 Dice；经历费用由 sealpack 0.4.7 校验并结算。升级不会自动补回旧版本已经丢失的零字段，需重新显式导入相应数值。
+5. PbDH 中选择对应人物，核对页面显示的 PbDH / Dice 名称，点击“确认关联当前人物卡”。所接入数值来自 Dice；未录入字段显示未知且禁用，不填 0。
+6. 点击六特质后的独立骰子按钮打开紧凑检定助手；属性格仍可编辑，失焦或回车只保存对应 Dice 字段。四项资源的 ± 支持右键/触摸长按改上限，拒绝上限低于当前值；不改 PbDH 皮肤、布局或独立模式。支持优劣势、反应、修正、难度、原因、经历勾选及手动 `.dd/.ddr` 公式。特质/经历读取 Dice；经历费用由 sealpack 0.4.7 校验并结算。升级不会自动补回旧版本已经丢失的零字段，需重新显式导入相应数值。
 
 | PbDH Module | Dice 当前值 | Dice 上限 | 含义 |
 | --- | --- | --- | --- |
 | hp | 生命 | 生命上限 | 已标记生命 |
 | stress | 压力 | 压力上限 | 已标记压力 |
-| armor-slots | 护甲 | 护甲上限 | 已标记护甲槽；不是护甲值 |
+| armor-slots | 护甲 | 护甲上限 | 已标记护甲槽 |
 | hope | 希望 | 希望上限 | 可用希望 |
+| handful-gold / bag-gold / chest-gold | 金币把 / 金币袋 / 金币箱 | 9 / 9 / 无上限 | 保持 PbDH 步进规则，不自动换算；外部较大值仍照实显示 |
+| evasion | 闪避 | — | 可编辑单字段 |
+| armor-value | 护甲上限 | — | 与护甲槽上限共用同一字段 |
+| major-threshold / severe-threshold | 重伤阈值 / 严重阈值 | — | 可编辑单字段 |
+
+主副武器摘要后的骰子按钮打开伤害助手，读取当前 PbDH 熟练度与武器的单骰条目（如 d8+3），生成熟练度个骰子加固定值的官方 .r 指令。支持额外同类骰、固定修正与额外骰；DamageAdjustment 是后续能力注入接口，不自动识别特性文字。发送前检查武器/熟练度是否变化。
 
 ## 本地双端预览
 
@@ -46,7 +52,7 @@ npm run preview:pbdh-embed -- "D:\path\to\PbDH\apps\platform\dist" "D:\path\to\r
 ## 验收与能力边界
 
 - 确认关联、打开和轮询不写 Dice；点击 `.st 希望-1` 等只写单字段；模拟外部结算可通过刷新和10秒轮询回读。
-- PbDH普通模式资源仍按原有方式保存；实验模式关闭后回到本地存档值。静态编辑不受影响。PbDH `.pbcha` / 文本导出仍是本地值，跑团期间整卡导入可能覆盖 Dice，不能视为会话导出。
+- PbDH普通模式资源仍按原有方式保存；实验模式关闭后回到本地存档值。其他静态编辑保持现有流程；已同步的数值编辑只保存 Dice，人物卡导出仍使用本地存档。PbDH `.pbcha` / 文本导出仍是本地值，跑团期间整卡导入可能覆盖 Dice，不能视为会话导出。
 - 切换PbDH人物、SealChat频道/用户/身份、观察到Dice卡名/类型变化或断线会解除关联；恢复后需重新确认。正在发送的消息无法撤销。
 - 宿主没有稳定Dice卡ID、原子expectedCardId、属性版本比较或通用属性推送；无法保证未观察到的A→B→A切卡、严格并发或跨设备去重。回读前的消息确认不等于Dice执行，超时不自动重发。
 - 资源修改会留下普通聊天消息。最大值在实验模式只读，使用既有显式导入/命令配置。不新增宿主补丁来绕过限制。
