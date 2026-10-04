@@ -5,7 +5,7 @@ import { bounded, settleOptional, parseGroupState } from './state.mjs';
 import {EXPERIENCE_FIELD, encodeExperiences, readExperiences, selectedExperiences} from './experiences.mjs';
 import {characterSummary} from './fields.mjs';
 
-const VERSION = '0.4.8';
+const VERSION = '0.4.10';
 const HELP = `.dd [算式] [adv/dis] [dc难度] [hope=费用] [-- 原因]
 例：.dd 敏捷+2+2d6k1 adv dc15 -- 攀爬
 .dd：动作掷骰；.ddr：反应掷骰；人物卡可勾选经历，每项消耗1希望。
@@ -127,11 +127,13 @@ function experienceCommand(ctx, args) {
   seal.vars.strSet(ctx,EXPERIENCE_FIELD,value);
   return `经历已写入当前人物卡（${readExperiences(value).length}项）`;
 }
-function pbDHCommand(ctx, args) {
-  if (args.length !== 2) throw Error('请在 PbDH iframe 中关联当前人物');
+function pbDHCommand(ctx, rawArgs) {
+  // 官方 rawArgs 保留姓名中的空格；args/cleanArgs 会拆词并提取 -- 参数。
+  const data = rawArgs.replace(/^\s*pbdh(?:\s+|$)/, '').trim();
+  if (!data) throw Error('请在 PbDH iframe 中关联当前人物');
   if (read(ctx,'$t游戏模式','str') !== 'daggerheart') throw Error('请先执行 .set dh');
   if (load(ctx).pending) throw Error('上次操作未完成，请先执行 .dh recover');
-  const payload = readPbDHBinding(args[1]);
+  const payload = readPbDHBinding(data);
   // Player.Name 是官方 Goja 公开的角色昵称；不访问人物卡管理器或改写绑卡元数据。
   if (!ctx.player || (ctx.group && typeof ctx.group.markDirty !== 'function')) throw Error('当前宿主不支持人物昵称保存');
   for (const [key,value] of Object.entries(payload.values)) seal.vars.intSet(ctx,key,value);
@@ -145,8 +147,8 @@ function pbDHCommand(ctx, args) {
   seal.vars.strSet(ctx,PBDH_SOURCE,payload.source);
   return 'PbDH 已关联：'+payload.name+'；资源已初始化';
 }
-function gmCommand(ctx, msg, args) {
-  if (args[0] === 'pbdh') return pbDHCommand(ctx,args);
+function gmCommand(ctx, msg, args, rawArgs) {
+  if (args[0] === 'pbdh') return pbDHCommand(ctx,rawArgs);
   if (args[0] === 'exp') return experienceCommand(ctx,args);
   if (args[0] === 'recover' && args.length === 1) return recover(ctx);
   if (ctx.isPrivate || !ctx.group?.groupId) throw new Error('请在群聊中指定GM');
@@ -179,11 +181,14 @@ function register(name, help, execute) {
     }
     try {
       const maxLength = name === 'dh' && ['exp','pbdh'].includes(args[0]) ? 4096 : 1000;
-      if (args.length > 80 || args.join(' ').length > maxLength) throw new Error('指令过长');
-      if (cmdArgs.kwargs?.length) throw new Error('原因前加独立的 --');
+      const bindingRequest = name === 'dh' && args[0] === 'pbdh';
+      const rawArgs = typeof cmdArgs.rawArgs === 'string' ? cmdArgs.rawArgs : args.join(' ');
+      if ((!bindingRequest && args.length > 80) || (bindingRequest ? rawArgs : args.join(' ')).length > maxLength) throw new Error('指令过长');
+      // 姓名内的 --word 是 JSON 数据；关联协议整串解析，尾随指令仍拒绝。
+      if (!bindingRequest && cmdArgs.kwargs?.length) throw new Error('原因前加独立的 --');
       if (Array.from(cmdArgs.at || []).some(at => at.userId !== ctx.endPoint?.userId)) throw new Error('请用自己的角色掷骰');
       if (ctx.privilegeLevel < 0) throw new Error('无权执行此操作');
-      seal.replyToSender(ctx, msg, execute(ctx, msg, args));
+      seal.replyToSender(ctx, msg, execute(ctx, msg, args, rawArgs));
     } catch (error) { seal.replyToSender(ctx, msg, error.message); }
     return seal.ext.newCmdExecuteResult(true);
   };

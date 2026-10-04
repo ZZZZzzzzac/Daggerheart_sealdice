@@ -36,7 +36,7 @@ function host(initial = {}, shared = new Map()) {
     dice: (...v) => { dice=v; }, context: o => { user=o.user ?? user; group=o.group ?? group; privilege=o.privilege ?? privilege; },
     fail: (u,k) => { fail=`${u}|${k}`; },
     run: (name,args=[],opts={}) => ext.cmdMap[name].solve({ ...context(), isPrivate: opts.private ?? false },
-      { rawId: opts.noId ? undefined : opts.id ?? String(++id) }, { args, at: opts.at ?? [], kwargs: [] }) };
+      { rawId: opts.noId ? undefined : opts.id ?? String(++id) }, { args, rawArgs: opts.rawArgs ?? args.join(" "), at: opts.at ?? [], kwargs: opts.kwargs ?? [] }) };
 }
 test('plain dd needs no resource fields or GM and never creates optional fields', () => {
   const h=host(); h.run('dd',[]); assert.equal(h.rolls,2); assert.match(h.replies.at(-1),/手动：希望\+1、压力-1/);
@@ -215,5 +215,22 @@ test('invalid iframe initialization rejects every field before any resource or n
     const h=host({希望:4});const before=JSON.stringify([...h.attrs()]);
     h.run('dh',['pbdh',encodeURIComponent(JSON.stringify(bad))]);assert.equal(JSON.stringify([...h.attrs()]),before);
     assert.equal(h.rolls,0);assert.doesNotMatch(h.replies.at(-1),/已关联/);
+  }
+});
+
+test('readable iframe JSON preserves spaces, quotes, percent signs and keyword-like names',()=>{
+  const payload={...binding,name:'杏丝·坦格利安  - Hope "旅者" 100% %E4 --adv 🐈'};
+  const rawArgs='pbdh '+JSON.stringify(payload);
+  const args=rawArgs.split(/\s+/).filter(arg=>arg!=='--adv');
+  const h=host({力量:99});h.run('dh',args,{rawArgs,kwargs:[{name:'adv'}]});
+  assert.equal(h.attrs().get('DHPbDH姓名'),payload.name);assert.equal(h.attrs().get('DHPbDH来源'),binding.source);
+  for(const [key,value] of Object.entries(binding.values)) assert.equal(h.attrs().get(key),value);
+  assert.equal(h.attrs().get('力量'),99);assert.match(h.replies.at(-1),/已关联/);
+});
+test('readable JSON rejects trailing commands and invalid resources before writes',()=>{
+  for(const raw of [JSON.stringify(binding)+' --adv', JSON.stringify(binding)+' .st 希望9', JSON.stringify({...binding,values:{...binding.values,金币袋:10}}),JSON.stringify({...binding,name:'bad\nname'}),'x'.repeat(4097)]) {
+    const h=host({希望:4});const before=JSON.stringify([...h.attrs()]);
+    const rawArgs='pbdh '+raw;h.run('dh',rawArgs.split(/\s+/),{rawArgs});
+    assert.equal(JSON.stringify([...h.attrs()]),before);assert.equal(h.rolls,0);assert.doesNotMatch(h.replies.at(-1),/已关联/);
   }
 });

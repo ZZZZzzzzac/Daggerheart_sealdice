@@ -45,7 +45,8 @@ window.addEventListener('message', e => {
         const resourceNames = ['生命','生命上限','压力','压力上限','护甲','护甲上限','希望','希望上限','金币把','金币袋','金币箱','DHPbDH来源'];
         let binding = null;
         if (req.params.text.startsWith('.dh pbdh ')) {
-          binding = JSON.parse(decodeURIComponent(req.params.text.slice(9)));
+          const raw = req.params.text.slice(9);
+          binding = JSON.parse(raw.startsWith('{') ? raw : decodeURIComponent(raw));
           if (typeof binding.name !== 'string' || !binding.name.trim() || typeof binding.source !== 'string'
               || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(binding.source)
               || Object.keys(binding.values).length !== 11
