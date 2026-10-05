@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { buildSync } from 'esbuild';
 import { unzipSync, strFromU8 } from 'fflate';
-import {EXPERIENCE_FIELD, encodeExperiences, experienceRevision, experienceToken, experienceImportCommand} from '../src/experiences.mjs';
 const bundle = buildSync({ entryPoints: [fileURLToPath(new URL('../src/main.mjs', import.meta.url))], bundle: true,
   write: false, platform: 'neutral', format: 'iife', target: 'es2020' }).outputFiles[0].text;
 function host(initial = {}, shared = new Map()) {
@@ -45,12 +44,12 @@ test('plain dd needs no resource fields or GM and never creates optional fields'
 });
 
 test('st show whitelist hides internal and arbitrary fields, preserves zero and delegates only read access',()=>{
-  const h=host({敏捷:0,希望:2,金币把:10,金币袋:0,金币箱:1,DH角色标识:'secret',DH经历:encodeExperiences([{name:'向导',modifier:2}]),任意私密字段:99});
+  const h=host({敏捷:0,希望:2,金币把:9,金币袋:0,金币箱:1,DH角色标识:'secret',DH经历:'obsolete',恐惧:12,金币:99,任意私密字段:99});
   const before=JSON.stringify([...h.attrs()]);h.run('st',['show']);
-  assert.match(h.replies.at(-1),/敏捷:0/);assert.match(h.replies.at(-1),/金币袋:0/);
-  assert.doesNotMatch(h.replies.at(-1),/DH角色标识|secret|DH经历|任意私密字段|99/);
+  assert.match(h.replies.at(-1),/敏捷:0/);assert.match(h.replies.at(-1),/金币：9 把 0 袋 1 箱/);
+  assert.doesNotMatch(h.replies.at(-1),/DH角色标识|secret|DH经历|任意私密字段|恐惧|99/);
   h.run('st',['show','DH角色标识']);assert.doesNotMatch(h.replies.at(-1),/secret|DH角色标识/);
-  h.run('st',['show','agi','把']);assert.match(h.replies.at(-1),/敏捷:0/);assert.match(h.replies.at(-1),/金币把:10/);
+  h.run('st',['show','agi','把']);assert.match(h.replies.at(-1),/敏捷:0/);assert.match(h.replies.at(-1),/金币：9 把 0 袋 1 箱/);
   h.attrs('SEALCHAT:G').set('希望',4);h.run('st',['show'],{at:[{userId:'SEALCHAT:G'}]});assert.match(h.replies.at(-1),/希望:4/);
   assert.equal(JSON.stringify([...h.attrs()]),before);assert.equal(h.rolls,0);
   const count=h.replies.length;assert.equal(h.run('st',['希望+1']).solved,false);assert.equal(h.replies.length,count);
@@ -70,16 +69,16 @@ test('GM fear uses GM current card, reflects external st and creates only GM mis
   h.run('dh',['gm','clear']); h.dice(3,8); h.run('dd',[]); assert.match(h.replies.at(-1),/手动：恐惧\+1/);
 });
 test('GM can be the roller without separate pools or double updates', () => {
-  const h=host({ 希望:2 }); h.run('dh',['gm','claim']); h.dice(3,8); h.run('dd',[]);
+  const h=host({ 希望:2 }); h.run('dh',['gm','me']); h.dice(3,8); h.run('dd',[]);
   assert.equal(h.attrs().get('恐惧'),1); assert.equal(h.attrs().get('希望'),2);
 });
 test('GM designation permissions and group separation, private rolls never use group GM', () => {
-  const h=host({ 希望:2 }); h.context({ privilege:0 }); h.run('dh',['gm','claim']); assert.match(h.replies.at(-1),/群管理/);
+  const h=host({ 希望:2 }); h.context({ privilege:0 }); h.run('dh',['gm','me']); assert.match(h.replies.at(-1),/群管理/);
   h.context({ privilege:50 }); h.run('dh',['gm','set','SEALCHAT:G']); h.context({ privilege:0 });
   h.run('dh',['gm','clear']); assert.match(h.replies.at(-1),/只有GM/);
   h.context({ user:'SEALCHAT:G' }); h.run('dh',['gm','clear']); assert.match(h.replies.at(-1),/卸任/);
   h.context({ group:'SEALCHAT:SECOND' }); h.run('dh',['gm']); assert.match(h.replies.at(-1),/未指定/);
-  h.run('dh',['gm','claim'],{private:true}); assert.match(h.replies.at(-1),/群聊/);
+  h.run('dh',['gm','me'],{private:true}); assert.match(h.replies.at(-1),/群聊/);
 });
 test('native st values update the next roll and missing fields stay absent', () => {
   const h=host({ 希望:2,压力:2 }); h.run('dd',[]); h.attrs().set('希望',4); h.attrs().delete('压力'); h.dice(2,2); h.run('dd',[]);
@@ -97,43 +96,6 @@ test('numeric modifiers never charge hope and old options fail before rolling', 
   const rolls=h.rolls; for(const arg of ['exp:e1','exp2','经历:e1','经历2']) h.run('dd',[arg]);
   assert.equal(h.rolls,rolls); assert.equal(h.attrs().get('希望'),2);
 });
-const experienceItems=[{name:'山野向导',modifier:2},{name:'守望者',modifier:3},{name:'零值经历',modifier:0}];
-const experienceArgs=(indices=[1])=>['敏捷',experienceToken(indices,experienceRevision(experienceItems))];
-test('experience import changes only the bounded current-card string field and survives reload',()=>{
-  const h=host({希望:4,压力:2,敏捷:1});
-  h.run('dh',experienceImportCommand(experienceItems).split(' ').slice(1));
-  assert.deepEqual([...h.attrs().entries()], [['希望',4],['压力',2],['敏捷',1],[EXPERIENCE_FIELD,encodeExperiences(experienceItems)]]);
-  h.reload();h.run('dh',['exp']);assert.match(h.replies.at(-1),/山野向导 \+2/);
-  h.context({user:'SEALCHAT:OTHER'});h.run('dh',['exp']);assert.match(h.replies.at(-1),/尚未导入/);
-  h.context({user:'SEALCHAT:P'});h.run('dh',['exp','set','bad']);assert.equal(h.attrs().get(EXPERIENCE_FIELD),encodeExperiences(experienceItems));
-  h.run('dh',['exp','clear']);assert.equal(h.attrs().get('希望'),4);assert.equal(h.attrs().get(EXPERIENCE_FIELD),encodeExperiences([]));
-});
-test('multiple experiences add their current modifiers and spend one Hope each before rewards',()=>{
-  const h=host({希望:3,压力:2,敏捷:1,[EXPERIENCE_FIELD]:encodeExperiences(experienceItems)});
-  h.dice(3,8);h.run('dd',experienceArgs([1,2]));
-  assert.equal(h.attrs().get('希望'),1);assert.match(h.replies.at(-1),/\[6\]/);assert.match(h.replies.at(-1),/希望消耗2/);assert.match(h.replies.at(-1),/希望3→1/);
-  h.attrs().set('希望',6);h.dice(8,3);h.run('dd',experienceArgs());assert.equal(h.attrs().get('希望'),6);
-  h.dice(2,2);h.run('dd',experienceArgs());assert.equal(h.attrs().get('希望'),6);assert.equal(h.attrs().get('压力'),1);
-});
-test('reaction and zero-modifier experiences still spend Hope; a repeated message never charges twice',()=>{
-  const h=host({希望:2,压力:2,[EXPERIENCE_FIELD]:encodeExperiences(experienceItems)});
-  h.run('ddr',experienceArgs([3]),{id:'experience-once'});assert.equal(h.attrs().get('希望'),1);assert.equal(h.attrs().get('压力'),2);
-  const rolls=h.rolls;h.reload();h.run('ddr',experienceArgs([3]),{id:'experience-once'});assert.equal(h.rolls,rolls);assert.equal(h.attrs().get('希望'),1);
-});
-test('missing/insufficient Hope, stale experience selection and invalid expressions fail before dice or spending',()=>{
-  for(const hope of [undefined,0,1]) {
-    const h=host({[EXPERIENCE_FIELD]:encodeExperiences(experienceItems),...(hope===undefined?{}:{希望:hope})});h.run('dd',experienceArgs([1,2]));assert.equal(h.rolls,0);assert.equal(h.attrs().get('希望'),hope);assert.match(h.replies.at(-1),/希望不足/);
-  }
-  const h=host({希望:3,[EXPERIENCE_FIELD]:encodeExperiences([{name:'新经历',modifier:9}])});h.run('dd',experienceArgs());assert.equal(h.rolls,0);assert.match(h.replies.at(-1),/经历已变化/);
-  h.attrs().set(EXPERIENCE_FIELD,encodeExperiences(experienceItems));h.run('dd',['bad',experienceArgs()[1]]);assert.equal(h.rolls,0);assert.equal(h.attrs().get('希望'),3);
-});
-test('failed experience payment recovers the same roll once and cannot re-import during pending writes',()=>{
-  const h=host({希望:3,压力:2,[EXPERIENCE_FIELD]:encodeExperiences(experienceItems)});h.fail('SEALCHAT:P','压力');h.run('dd',experienceArgs([1,2]),{id:'paid'});
-  assert.match(h.replies.at(-1),/保存失败/);assert.equal(h.attrs().get('希望'),2);const rolls=h.rolls;
-  h.run('dh',['exp','clear']);assert.match(h.replies.at(-1),/recover/);
-  h.reload();h.run('dh',['recover']);assert.equal(h.attrs().get('希望'),2);assert.equal(h.attrs().get('压力'),1);assert.equal(h.rolls,rolls);
-  h.run('dd',experienceArgs([1,2]),{id:'paid'});assert.equal(h.attrs().get('希望'),2);assert.equal(h.rolls,rolls);
-});
 test('repeat message including reload does not reroll or reapply GM fear', () => {
   const h=host(); h.run('dh',['gm','set','SEALCHAT:G']); h.dice(3,8); h.run('dd',[],{id:'one'});
   const rolls=h.rolls; h.reload(); h.run('dd',[],{id:'one'}); assert.equal(h.rolls,rolls); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),1);
@@ -149,7 +111,7 @@ test('failed GM write recovery verifies original owner and GM current card', () 
   const h=host(); h.run('dh',['gm','set','SEALCHAT:G']); h.fail('SEALCHAT:G','恐惧'); h.dice(3,8); h.run('dd',[]);
   assert.match(h.replies.at(-1),/保存失败/); const rolls=h.rolls, role=h.attrs('SEALCHAT:G').get('DH角色标识');
   h.context({user:'SEALCHAT:G'}); h.run('dh',['recover']); assert.match(h.replies.at(-1),/原玩家/);
-  h.context({user:'SEALCHAT:P'}); h.attrs('SEALCHAT:G').set('DH角色标识','other'); h.run('dh',['recover']); assert.match(h.replies.at(-1),/切回原角色/);
+  h.context({user:'SEALCHAT:P'}); h.attrs('SEALCHAT:G').set('DH角色标识','other'); h.run('dh',['recover']); assert.match(h.replies.at(-1),/切回原人物卡/);
   h.attrs('SEALCHAT:G').set('DH角色标识',role); h.reload(); h.run('dh',['recover']); assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),1); assert.equal(h.rolls,rolls);
 });
 test('removed resource commands cannot mutate attributes or stored pool', () => {
@@ -170,28 +132,21 @@ test('archive includes only native package files and optional fields have no def
     assert.deepEqual(Buffer.from(zip[asset]),readFileSync(new URL(`../${asset}`,import.meta.url)));
   }
   const yaml=strFromU8(zip['templates/daggerheart.yaml']); assert.match(yaml,/恐惧: \[fear\]/);
-  for(const field of ['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','金币','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值']) {
+  for(const field of ['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值']) {
     assert.match(yaml,new RegExp(`^    ${field}: "null"$`,'m'));
     assert.doesNotMatch(yaml,new RegExp(`^    ${field}: [0-9]`,'m'));
   }
   new vm.Script(strFromU8(zip['scripts/daggerheart.js']));
 });
 
-const pbdhId = '01234567-89ab-4cde-8fab-0123456789ab';
 test('iframe numeric modifiers and explicit fee do not read persisted traits or experiences',()=>{
-  const h=host({力量:99,希望:2,压力:2,DHPbDH来源:pbdhId,DH角色标识:'iframe-role',DH经历:'invalid old data'});
-  h.dice(8,3);h.run('dd',['3+2','hope=1','pbdh='+pbdhId,'--','知识 · 经历']);
+  const h=host({力量:99,希望:2,压力:2,DH角色标识:'iframe-role',DH经历:'invalid old data'});
+  h.dice(8,3);h.run('dd',['3+2','hope1','--','知识 · 经历']);
   assert.equal(h.rolls,2);assert.equal(h.attrs().get('希望'),2);assert.equal(h.attrs().get('DH经历'),'invalid old data');
   assert.match(h.replies.at(-1),/\(3\+2\)\[5\]/);assert.match(h.replies.at(-1),/希望消耗1/);
 });
-test('iframe fee insufficiency or wrong source rejects before dice or writes',()=>{
-  for (const initial of [{希望:0,DHPbDH来源:pbdhId},{希望:3,DHPbDH来源:'other'},{希望:3}]) {
-    const h=host(initial);const before=JSON.stringify([...h.attrs()]);h.run('dd',['0','hope=1','pbdh='+pbdhId]);
-    assert.equal(h.rolls,0);assert.equal(JSON.stringify([...h.attrs()]),before);
-  }
-});
 test('iframe explicit fee uses existing recovery and duplicate receipts across reload',()=>{
-  const h=host({希望:3,压力:2,DHPbDH来源:pbdhId});const args=['0','hope=2','pbdh='+pbdhId];
+  const h=host({希望:3,压力:2});const args=['0','hope2'];
   h.fail('SEALCHAT:P','压力');h.run('dd',args,{id:'iframe-paid'});assert.match(h.replies.at(-1),/保存失败/);
   assert.equal(h.attrs().get('希望'),2);const rolls=h.rolls;h.reload();h.run('dh',['recover']);
   assert.equal(h.attrs().get('希望'),2);assert.equal(h.attrs().get('压力'),1);assert.equal(h.rolls,rolls);
@@ -205,13 +160,13 @@ const binding = {source:'10685716-e3e7-4a46-9fbc-0361dfefa196',name:'汉妮 - Ho
 test('iframe binding bypasses st name syntax, preserves zero and only initializes allowed fields',()=>{
   const h=host({力量:99,DH经历:'old'});
   h.run('dh',['pbdh',encodeURIComponent(JSON.stringify(binding))]);
-  assert.equal(h.attrs().get('DHPbDH来源'),binding.source);assert.equal(h.attrs().get('DHPbDH姓名'),binding.name);
+  assert.equal(h.attrs().get('DH来源'),binding.source);assert.equal(h.attrs().get('DH姓名'),binding.name);
   for(const [key,value] of Object.entries(binding.values)) assert.equal(h.attrs().get(key),value);
   assert.equal(h.attrs().get('力量'),99);assert.equal(h.attrs().get('DH经历'),'old');
   assert.match(h.replies.at(-1),/PbDH 已关联：汉妮 - Hope "旅者"/);
 });
 test('invalid iframe initialization rejects every field before any resource or nickname write',()=>{
-  for(const bad of [{...binding,source:'broken'}, {...binding,name:'bad\nname'}, {...binding,values:{...binding.values,希望:-1}}, {...binding,values:{...binding.values,金币袋:10}}, {...binding,values:{...binding.values,力量:3}}, {...binding,values:{...binding.values,护甲上限:61}}]) {
+  for(const bad of [{...binding,source:'broken'}, {...binding,name:'bad\nname'}, {...binding,values:{...binding.values,希望:-1}}, {...binding,values:{...binding.values,金币袋:10}}, {...binding,values:{...binding.values,金币箱:2}}, {...binding,values:{...binding.values,力量:3}}, {...binding,values:{...binding.values,护甲上限:61}}]) {
     const h=host({希望:4});const before=JSON.stringify([...h.attrs()]);
     h.run('dh',['pbdh',encodeURIComponent(JSON.stringify(bad))]);assert.equal(JSON.stringify([...h.attrs()]),before);
     assert.equal(h.rolls,0);assert.doesNotMatch(h.replies.at(-1),/已关联/);
@@ -223,7 +178,7 @@ test('readable iframe JSON preserves spaces, quotes, percent signs and keyword-l
   const rawArgs='pbdh '+JSON.stringify(payload);
   const args=rawArgs.split(/\s+/).filter(arg=>arg!=='--adv');
   const h=host({力量:99});h.run('dh',args,{rawArgs,kwargs:[{name:'adv'}]});
-  assert.equal(h.attrs().get('DHPbDH姓名'),payload.name);assert.equal(h.attrs().get('DHPbDH来源'),binding.source);
+  assert.equal(h.attrs().get('DH姓名'),payload.name);assert.equal(h.attrs().get('DH来源'),binding.source);
   for(const [key,value] of Object.entries(binding.values)) assert.equal(h.attrs().get(key),value);
   assert.equal(h.attrs().get('力量'),99);assert.match(h.replies.at(-1),/已关联/);
 });
@@ -253,7 +208,7 @@ test('invalid badge fields reject the whole binding before any writes',()=>{
 
 test('iframe rolls use exactly three lines with labels and fees in their respective rows',()=>{
   const h=host({希望:2,希望上限:6,压力:3});h.dice(9,5);
-  h.run('dd',['3+2','hope=1','dc15','--','知识','·','旅行者']);
+  h.run('dd',['3+2','hope1','dc15','--','知识','·','旅行者']);
   const lines=h.replies.at(-1).split('\n');
   assert.equal(lines.length,3);assert.equal(lines[0],'【玩家】动作掷骰 · 知识 · 旅行者 · 普通');
   assert.match(lines[1],/希望9\[1d12\]\+恐惧5\[1d12\]\+\(3\+2\)\[5\]=19 > 难度15 ⇒ \*\*✅【希望成功】\*\*$/);
@@ -261,13 +216,38 @@ test('iframe rolls use exactly three lines with labels and fees in their respect
   assert.equal(h.attrs().get('希望'),2);assert.equal(h.attrs().get('压力'),3);
   assert.doesNotMatch(h.replies.at(-1),/修正已计入|pbdh=/);
 });
-test('stored experiences move to the first line without changing Hope costs or creating a fourth line',()=>{
-  const items=[{name:'旅行者',modifier:2}];
-  const h=host({希望:3,敏捷:1,[EXPERIENCE_FIELD]:encodeExperiences(items)});h.dice(5,9);
-  h.run('dd',['敏捷',experienceToken([1],experienceRevision(items)),'dc20','--','攀爬']);
-  const lines=h.replies.at(-1).split('\n');
-  assert.equal(lines.length,3);assert.match(lines[0],/敏捷 · 经历：旅行者\(\+2\) · 攀爬 · 普通$/);
-  assert.match(lines[1],/\*\*❌【恐惧失败】\*\*$/);
-  assert.equal(lines[2],'资源：希望消耗1 ｜ 希望3→2 ｜ 手动：恐惧+1');
-  assert.equal(h.attrs().get('希望'),2);
+
+test('hope shorthand supports implicit one and zero, and rejects missing balances before rolling',()=>{
+  const h=host({希望:3});h.run('ddr',['0','hope']);assert.equal(h.attrs().get('希望'),2);
+  h.run('ddr',['0','hope0']);assert.equal(h.attrs().get('希望'),2);
+  for(const hope of [undefined,0,1]) {
+    const insufficient=host(hope===undefined ? {} : {希望:hope});insufficient.run('dd',['3+2','hope2']);
+    assert.equal(insufficient.rolls,0);assert.equal(insufficient.attrs().get('希望'),hope);
+    assert.match(insufficient.replies.at(-1),/本次掷骰需要2点希望/);
+  }
+  const invalid=host({希望:3});invalid.run('dd',['bad','hope']);assert.equal(invalid.rolls,0);assert.equal(invalid.attrs().get('希望'),3);
+});
+test('deleted commands and assignment options cannot restore retired experience or source protocols',()=>{
+  const h=host({希望:3,DH经历:'old'});
+  for(const args of [['exp'],['exp','clear'],['init'],['gm','claim']]) {h.run('dh',args);assert.match(h.replies.at(-1),/用法/);}
+  for(const arg of ['hope=1','exp=1@12345678','pbdh=01234567-89ab-4cde-8fab-0123456789ab']) h.run('dd',['0',arg]);
+  assert.equal(h.rolls,0);assert.equal(h.attrs().get('希望'),3);assert.equal(h.attrs().get('DH经历'),'old');
+});
+test('GM me and query display live nickname and Fear without platform IDs',()=>{
+  const h=host({恐惧:4});h.run('dh',['gm','me']);assert.equal(h.replies.at(-1),'GM：玩家 ｜ 恐惧4/12');
+  h.attrs().set('恐惧',7);h.run('dh',['gm']);assert.equal(h.replies.at(-1),'GM：玩家 ｜ 恐惧7/12');
+  h.run('dh',['gm','set','SEALCHAT:G']);assert.equal(h.replies.at(-1),'GM：玩家 ｜ 恐惧0/12');
+  h.attrs('SEALCHAT:G').set('恐惧',12);h.run('dh',['gm']);assert.equal(h.replies.at(-1),'GM：玩家 ｜ 恐惧12/12');
+  assert.doesNotMatch(h.replies.at(-1),/SEALCHAT/);
+});
+test('Hope and Fear saturation warn in the resources line, spending before gains does not overflow',()=>{
+  const h=host({希望:6});h.dice(8,3);h.run('dd',[]);assert.match(h.replies.at(-1),/资源：希望6\/6（溢出1点）/);
+  h.dice(8,3);h.run('dd',['0','hope']);assert.doesNotMatch(h.replies.at(-1),/溢出/);assert.equal(h.attrs().get('希望'),6);
+  h.run('dh',['gm','set','SEALCHAT:G']);h.attrs('SEALCHAT:G').set('恐惧',12);h.dice(3,8);h.run('dd',[]);
+  assert.match(h.replies.at(-1),/资源：恐惧12\/12（溢出1点）/);assert.equal(h.attrs('SEALCHAT:G').get('恐惧'),12);
+});
+test('grouped gold preserves unknowns and zeros, excludes legacy gold and Fear even when selected',()=>{
+  const h=host({金币袋:0,金币:999,恐惧:12});h.run('st',['show']);assert.equal(h.replies.at(-1),'【玩家】的个人属性：\n金币：? 把 0 袋 ? 箱');
+  h.run('st',['show','恐惧']);assert.match(h.replies.at(-1),/没有可显示/);
+  h.run('st',['show','金币']);assert.match(h.replies.at(-1),/金币：\? 把 0 袋 \? 箱/);assert.doesNotMatch(h.replies.at(-1),/999/);
 });

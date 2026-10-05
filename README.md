@@ -1,29 +1,26 @@
 # Daggerheart Seal 开发工作区
 
-按用户要求从零重写匕首之心扩展：旧业务代码只用于提取功能与需求，不迁移、不作为新构建依赖。默认正式版核心，额外玩法独立可选。PbDH通过“导出为海豹骰”提供数值与经历，编辑和升级在PbDH完成；Dice/Chat维护跑团动态资源与昵称标签。生产配置仍在旁边的 Daggerheart_VPS 仓库。
+当前采用PbDH iframe作为SealChat人物卡。属性、经历、装备与完整存档由PbDH保存；Dice保存跑团资源副本和徽标字段，执行通用.dd/.ddr。旧HTML人物卡、Dice经历协议与构建入口已移除，历史从Git查阅。正式入口是Seal master与PbDH main；部署配置只在Daggerheart_VPS维护。
 
 | 目录 | 用途 |
 | --- | --- |
-| sealdice/packages/daggerheart/ | 原生sealpack，当前0.4.7支持经历持久化/自动扣希望，保留全部受支持数值的0 |
-| sealchat/ | 原生人物卡HTML：数值、经历勾选、.st/.dd操作；嵌入窗可选，待完整真实联动验收 |
-| reference/ | 对应服务器版本的只读源码与版本清单 |
-| docs/DAGGERHEART_REWRITE.md | 功能提取、四个优先级、实现范围与剩余验收 |
-| archive/sealchat-character-sheet/ | 旧人物卡与皮肤的只读参考，供布局对照，不作为构建或发布入口 |
+| sealdice/packages/daggerheart/ | zac/daggerheart 0.5.0规则包 |
+| sealchat/pbdh-embed/ | 官方Embed/iForm配置、预览及接入说明 |
+| reference/ | 固定版本只读上游接口核对 |
+| docs/ | 开发、数据职责和功能文案审阅说明 |
+| archive/ | 历史只读参考，不作为当前发布入口 |
 
-Node.js 22或更新的受支持LTS，在根目录：
+Node.js22或更新的受支持LTS，使用npm：
 
-```powershell
-npm ci
-npm test
-npm run test:sheet
-npm run build
-npm run check-reference
-```
+    npm ci
+    npm test
+    npm run test:pbdh-embed
+    npm run check-reference
 
-产物：[daggerheart-0.4.7.sealpack](sealdice/packages/daggerheart/dist/daggerheart-0.4.7.sealpack)。核心插件已完成隔离官方SealDice1.6.1验收，不自动上传生产。无需Chat即可用.dd和原生.st；玩家希望/压力存在时独立结算，指定GM时恐惧写入GM当前卡；资源增减统一.st。人物卡用同一原生HTML，PbDH“导出为海豹骰”的同一条.st包含数值和DH经历，持久化到Dice。掷骰窗勾选经历，每项自动扣1希望，余额不足不投骰；不整卡写回、不保存图片或其他资料。无需频道嵌入窗或宿主补丁，iForm仅可选。完整未修改Chat/Dice真实联动尚未验收，边界见[人物卡方案](docs/CHARACTER_STATE.md)。援助确认不在当前计划。
+不修改、打补丁或重新编译SealChat/Dice宿主。开发说明见docs/DEVELOPMENT.md，当前功能见sealdice/packages/daggerheart/README.md，文案清单见docs/SEALPACK_REVIEW.md，数据方案见docs/CHARACTER_STATE.md。
 
-旧插件、类型声明和构建工具已移除；需要查阅旧实现时从 Git 历史恢复。新工作按[重写需求](docs/DAGGERHEART_REWRITE.md)、[开发指南](docs/DEVELOPMENT.md)和[只读参考约束](reference/AGENTS.md)推进。
+其他平台仍可手输.dd/.ddr与.st；经历手动转成修正并写hope/hopeN。PbDH“导出海豹骰”只导出数字快照，不导出经历。无需.dh init。
 
-计划已发布到[GitHub Issues](docs/GITHUB_ISSUES.md)，阻塞依赖以GitHub原生关系为准。
+生产配置只在相邻Daggerheart_VPS仓库维护；不自动上传/重启生产。豹仓发布入口npm run publish:sealrepo，仅zac/daggerheart，凭据不入Git且不输出，同版本不得盲目覆盖。
 
-豹仓安装入口：[zac/daggerheart](https://repo.sealdice.com/packages?namespace=zac&package=daggerheart)。完成当前版本隔离宿主验收后，用npm run publish:sealrepo验证并上传；令牌保存在忽略的.env.local，配置与发布流程见[开发指南](docs/DEVELOPMENT.md)。
+iframe部署和频道安装步骤见[PbDH iframe接入](sealchat/pbdh-embed/README.md)。它随PbDH前端发布，无须单独托管另一张HTML人物卡。

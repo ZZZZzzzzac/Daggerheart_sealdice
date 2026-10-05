@@ -1,7 +1,7 @@
 // Host adapter for the same DiceScript VM and character-load hooks as native .r.
 // Do not implement dice arithmetic, functions, aliases or attribute substitution here.
 export function normalizeExpression(expression) {
-  // User shorthand l1 means keep low; native syntax is kl1/q1.
+  // h/l are shorthand for native kh/kl; k/q and kh/kl pass through unchanged.
   let quote = '', escaped = false, output = '';
   for (let i = 0; i < expression.length; i++) {
     const c = expression[i];
@@ -11,7 +11,7 @@ export function normalizeExpression(expression) {
       else if (c === '\\') escaped = true;
       else if (c === quote) quote = '';
     } else if (c === '"' || c === "'") { quote = c; output += c; }
-    else if ((c === 'l' || c === 'L') && /(^|[^A-Za-z0-9_\u0080-\uffff])\d*[dD]\d+$/.test(output) && /\d/.test(expression[i + 1] || '')) output += 'kl';
+    else if (/[hHlL]/.test(c) && /(^|[^A-Za-z0-9_\u0080-\uffff])\d*[dD]\d+$/.test(output) && /\d/.test(expression[i + 1] || '')) output += c.toLowerCase() === 'h' ? 'kh' : 'kl';
     else output += c;
   }
   return output;

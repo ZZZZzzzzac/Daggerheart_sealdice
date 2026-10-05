@@ -34,9 +34,12 @@ test('expression failures precede duality dice; bad options and random sources r
   assert.throws(()=>rollRequest(parseRequest([]),()=>0));
 });
 
-test('explicit Hope cost is transient, bounded, unique and incompatible with experience indices',()=>{
-  const id='01234567-89ab-4cde-8fab-0123456789ab';const r=parseRequest(['3+2','hope=1','pbdh='+id,'adv','--','经历']);
-  assert.equal(r.expression,'3+2');assert.equal(r.hopeCost,1);assert.equal(r.pbdh,id);assert.equal(r.reason,'经历');
-  for(const args of [['hope=-1'],['hope=6'],['hope=1.5'],['hope=1','hope=2'],['exp=1@12345678','hope=1'],['pbdh=bad'],['pbdh='+id,'pbdh='+id]]) assert.throws(()=>parseRequest(args));
-  assert.equal(parseRequest(['--','hope=1']).hopeCost,undefined);
+
+test('Hope syntax is transient, bounded, unique and respects grouping and reason',()=>{
+  for(const [option,cost] of [['hope',1],['hope0',0],['hope1',1],['hope2',2],['hope5',5],['HOPE',1]]) assert.equal(parseRequest(['3+2',option]).hopeCost,cost);
+  for(const args of [['hope6'],['hope10'],['hope1.5'],['hope=1'],['hope','hope2']]) assert.throws(()=>parseRequest(args));
+  assert.equal(parseRequest(['--','hope2']).hopeCost,undefined);
+  assert.equal(parseRequest(['(hope + 2)']).hopeCost,undefined);
+  assert.equal(parseRequest(['exp=1@12345678']).expression,'exp=1@12345678');
+  assert.equal(parseRequest(['pbdh=obsolete']).expression,'pbdh=obsolete');
 });

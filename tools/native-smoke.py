@@ -12,8 +12,6 @@ def main():
     parser.add_argument('--binary',required=True)
     parser.add_argument('--skip-restart',action='store_true',help='Skip previously verified persistence check for copy-only patches')
     parser.add_argument('--zero-resources-only',action='store_true',help='Check native st storage, zero-value labels and resource persistence on a bound card')
-    parser.add_argument('--experiences-only',action='store_true',help='Check bounded experience import, native rolls, Hope costs and restart persistence')
-    parser.add_argument('--st-export-fixture',help='Synthetic fixture from the real PbDH formatter: command and experiences')
     parser.add_argument('--summary-gold-only',action='store_true',help='Check st show whitelist and separate native gold quantities')
     parser.add_argument('--restart-before-enable',action='store_true',help='Verify re-enable after host restart when Windows retains cache-directory handles')
     args=parser.parse_args()
@@ -44,26 +42,23 @@ def main():
 const e=seal.ext.new('native-smoke-helper','local-test','1.0.0');
 const c=seal.ext.newCmdItemInfo();c.name='smokegm';
 c.solve=(ctx,msg,args)=>{
-  const m=seal.newMessage();m.messageType='group';m.groupId=ctx.group.groupId;m.sender.userId='UI:1003';
+  const m=seal.newMessage();m.messageType='group';m.groupId=ctx.group.groupId;m.sender.userId='UI:1003';m.sender.nickname='本地GM';
   const g=seal.createTempCtx(ctx.endPoint,m);
   if(args.args[0]==='zero') seal.vars.intSet(g,'恐惧',0);
+  if(args.args[0]==='max') seal.vars.intSet(g,'恐惧',12);
+  g.player.name='本地GM';
   const [value,exists]=seal.vars.intGet(g,'恐惧');
   seal.replyToSender(ctx,msg,'GM卡恐惧='+value+';存在='+exists);
   return seal.ext.newCmdExecuteResult(true);
 };e.cmdMap['smokegm']=c;seal.ext.register(e);
 const resources=seal.ext.newCmdItemInfo();resources.name='smokeresources';
 resources.solve=(ctx,msg)=>{
-  const fields=['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','金币','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值'];
+  const fields=['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','金币把','金币袋','金币箱','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值'];
   const values={};for(const field of fields) values[field]=seal.vars.intGet(ctx,field);
   seal.replyToSender(ctx,msg,'RESOURCES='+JSON.stringify(values)+';LABEL='+seal.format(ctx,'生命{生命}/{生命上限}|护甲{护甲}/{护甲上限}'));
   return seal.ext.newCmdExecuteResult(true);
 };e.cmdMap['smokeresources']=resources;
-const experiences=seal.ext.newCmdItemInfo();experiences.name='smokeexperiences';
-experiences.solve=(ctx,msg)=>{
-  const [stored,exists]=seal.vars.strGet(ctx,'DH经历');
-  seal.replyToSender(ctx,msg,'EXPERIENCES='+JSON.stringify({stored,exists,hope:seal.vars.intGet(ctx,'希望')[0],stress:seal.vars.intGet(ctx,'压力')[0]}));
-  return seal.ext.newCmdExecuteResult(true);
-};e.cmdMap['smokeexperiences']=experiences;
+
 """,encoding='utf-8')
     log=(runtime/'stdout.local.log').open('ab')
     process=None; token=''; url=''
@@ -113,78 +108,26 @@ experiences.solve=(ctx,msg)=>{
         if args.summary_gold_only:
             command('.pc new smoke-gold')
             command('.st 敏捷=0 生命=0 生命上限=5 护甲=0 护甲上限=4 希望=2 金币把=0 金币袋=9 金币箱=1 恐惧=7 DH角色标识="keep-recovery-role" 任意私密字段=99')
-            output=command('.st show','金币把:0')
-            for text in ['敏捷:0','生命:0','护甲:0','金币袋:9','金币箱:1','恐惧:7']: assert text in output,output
-            for text in ['DH角色标识','keep-recovery-role','任意私密字段','99']: assert text not in output,output
+            output=command('.st show','金币：0 把 9 袋 1 箱')
+            for text in ['敏捷:0','生命:0','护甲:0','金币：0 把 9 袋 1 箱']: assert text in output,output
+            for text in ['DH角色标识','keep-recovery-role','任意私密字段','恐惧:7','99']: assert text not in output,output
             output=command('.st show DH角色标识')
             assert 'keep-recovery-role' not in output and 'DH角色标识' not in output,output
             command('.st show agi 把','敏捷:0')
             command('.st 把+1 袋+1 箱-1')
-            command('.st list','金币袋:10')
-            command('.st show 金币把 金币箱','金币箱:0')
+            command('.st list','金币：')
+            command('.st show 金币把 金币箱','0 箱')
             command('.st export','keep-recovery-role')
             step('/package/reload',data={'id':package_id})
-            command('.st show','金币把:1')
+            command('.st show','金币：1 把')
             if not args.skip_restart:
                 print('Waiting for native attribute persistence before restart.',flush=True)
                 for _ in range(65): time.sleep(1)
-                stop();start();command('.st show','金币把:1')
+                stop();start();command('.st show','金币：1 把')
             report['passed']=True;report['persistence_checked']=not args.skip_restart
             return
-        if args.experiences_only:
-            command('.pc new smoke-experiences')
-            command('.st 敏捷1 希望3 压力2 生命0 生命上限5 护甲0 护甲上限4')
-            fixture=json.loads(Path(args.st_export_fixture).read_text(encoding='utf-8')) if args.st_export_fixture else None
-            items=fixture['experiences'] if fixture else [{'name':'向导 "甲" O\'Brien \\ {敏捷} ＋－＝：＆＊ </body> 🐈','modifier':2},{'name':'守望者','modifier':3}]
-            def encoded(items):
-                return json.dumps({'schemaVersion':1,'experiences':items},ensure_ascii=False,separators=(',',':'))
-            def selection(items, indices):
-                h=5381
-                units=encoded(items).encode('utf-16-le')
-                for offset in range(0,len(units),2): h=((h*33)^int.from_bytes(units[offset:offset+2],'little'))&0xffffffff
-                return 'exp='+','.join(map(str,indices))+'@'+format(h,'08x')
-            def install(items):
-                literal=json.dumps({'schemaVersion':1,'experiences':items},ensure_ascii=True,separators=(',',':'))
-                command('.st DH经历='+json.dumps(literal,ensure_ascii=False))
-            def inspect(items,hope):
-                output=command('.smokeexperiences')
-                data=json.loads(output.split('EXPERIENCES=',1)[1])
-                assert data['exists'] and json.loads(data['stored'])==json.loads(encoded(items)),data
-                assert data['hope']==hope,data
-            if fixture:
-                assert fixture['command'].startswith('.st ') and '\n' not in fixture['command']
-                command(fixture['command'])
-            else: install(items)
-            inspect(items,3)
-            assert 'DH经历' not in command('.st show')
-            experience_selection=selection(items,[1,2])
-            result=command('.ddr 敏捷 '+experience_selection,'希望消耗2')
-            assert '[6]' in result and '希望3→1' in result,result
-            inspect(items,1)
-            command('.ddr 敏捷 '+experience_selection,'希望不足');inspect(items,1)
-            command('.st 希望2')
-            command('.ddr 1/0 '+experience_selection,'算式无效');inspect(items,2)
-            install([]);inspect([],2)
-            install(items);inspect(items,2)
-            changed=[{'name':'新经历','modifier':9}];install(changed)
-            command('.ddr 敏捷 '+experience_selection,'经历已变化');inspect(changed,2)
-            zero=[{'name':'零值经历','modifier':0}];install(zero)
-            command('.st 希望1');command('.ddr 敏捷 '+selection(zero,[1]),'希望1→0');inspect(zero,0)
-            command('.ddr 敏捷 '+selection(zero,[1]),'希望不足');inspect(zero,0)
-            install(items);command('.st 希望4')
-            step('/package/reload',data={'id':package_id});inspect(items,4)
-            command('.st 希望-1');inspect(items,3)
-            if not args.skip_restart:
-                print('Waiting for the host 60s attribute persistence tick before restart.',flush=True)
-                for _ in range(65): time.sleep(1)
-                stop();start();inspect(items,3)
-                command('.ddr 敏捷 '+selection(items,[1]),'希望3→2');inspect(items,2)
-            report['passed']=True
-            report['persistence_checked']=not args.skip_restart
-            print('PASS native experience strings, UTF-8, costs, stale selection, reload and persistence.',flush=True)
-            return
         if args.zero_resources_only:
-            fields=['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','金币','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值']
+            fields=['敏捷','力量','灵巧','本能','风度','知识','生命','压力','护甲','希望','恐惧','生命上限','压力上限','护甲上限','希望上限','闪避','重伤阈值','严重阈值']
             def inspect(values):
                 output=command('.smokeresources')
                 for field in fields:
@@ -251,25 +194,62 @@ experiences.solve=(ctx,msg)=>{
         reaction=command('.ddr 敏捷 dc15','掷骰')
         assert '压力' not in reaction and '→' not in reaction
         command('.st show 希望','希望:2')
-        command('.dh gm set UI:1003','GM：UI:1003')
+        command('.dh gm me','GM：')
+        command('.dh gm set UI:1003','GM：')
         command('.smokegm zero','GM卡恐惧=0;存在=true')
         for _ in range(40):
             result=command('.dd 敏捷','掷骰')
             if '恐惧0→1' in result: break
         else: raise AssertionError('No Fear in 40 real rolls')
         command('.smokegm','GM卡恐惧=1;存在=true')
-        command('.st show 恐惧')
+        command('.st show 恐惧','没有可显示')
         command('.dh gm clear','GM已卸任')
         command('.dh fear +1','用法：')
         command('.dh 希望 -1','用法：')
         command('.st 希望2')
         command('.ddr 敏捷 +2 dc15','掷骰')
         command('.st show 希望','希望:2')
-        command('.dd exp:e1','算式无效')
+        command('.dh exp','用法：')
+        command('.dh init','用法：')
+        command('.dh gm claim','用法：')
+        command('.dd exp=1@12345678','掷骰算式')
+        command('.dd pbdh=12345678-1234-1234-1234-123456789abc','掷骰算式')
+        command('.dd hope=1','不使用等号')
         command('.st 希望-1')
         command('.st show 希望','希望:1')
+        for suffix in ['k','q','kh','kl','h','l']:
+            command('.ddr 3d1'+suffix+'1','[1]')
+        command('.st 希望3')
+        command('.ddr 3+2 hope2 -- 知识 · 两项经历','希望消耗2')
+        command('.st show 希望','希望:1')
+        command('.ddr 0 hope','希望消耗1')
+        command('.st show 希望','希望:0')
+        command('.ddr 0 hope2','希望不足：本次掷骰需要2点希望')
+        command('.ddr 0 hope0','资源：无变化')
+        payload={'source':'12345678-1234-1234-1234-123456789abc','name':'测试人物卡 - Hope "旅者"','values':{'生命':0,'生命上限':7,'压力':0,'压力上限':6,'护甲':0,'护甲上限':5,'希望':2,'希望上限':6,'金币把':1,'金币袋':0,'金币箱':1,'闪避':11,'重伤阈值':11,'严重阈值':22}}
+        command('.dh pbdh '+json.dumps(payload,ensure_ascii=False,separators=(',',':')),'PbDH 已关联：测试人物卡')
+        command('.st show','金币：1 把 0 袋 1 箱')
+        bad={**payload,'values':{**payload['values'],'金币箱':2}}
+        command('.dh pbdh '+json.dumps(bad,ensure_ascii=False,separators=(',',':')),'PbDH 金币数量越界')
+        command('.st 希望6')
+        for _ in range(40):
+            result=command('.dd 0','掷骰')
+            if '希望6/6（溢出1点）' in result: break
+        else: raise AssertionError('No Hope overflow in 40 rolls')
+        command('.smokegm max','GM卡恐惧=12;存在=true')
+        command('.dh gm set UI:1003','GM：本地GM ｜ 恐惧12/12')
+        for _ in range(40):
+            result=command('.dd 0','掷骰')
+            if '恐惧12/12（溢出1点）' in result: break
+        else: raise AssertionError('No Fear overflow in 40 rolls')
+        command('.smokegm zero','GM卡恐惧=0;存在=true')
+        for _ in range(40):
+            result=command('.dd 0','掷骰')
+            if '恐惧0→1' in result: break
+        else: raise AssertionError('No Fear gain in 40 rolls')
+        command('.dh gm','GM：本地GM ｜ 恐惧1/12')
         command('.st 希望4 金币把7')
-        command('.dh gm set UI:1003','GM：UI:1003')
+        command('.dh gm set UI:1003','GM：')
         for path in ['/package/disable','/package/reload','/package/enable','/package/reload']:
             if path == '/package/enable' and args.restart_before_enable:
                 print('Restarting the isolated host before re-enable (Windows cache rename workaround).',flush=True)
@@ -283,9 +263,13 @@ experiences.solve=(ctx,msg)=>{
             for _ in range(65): time.sleep(1)
             stop(); start()
             command('.st show 希望','希望:4')
-            command('.st show 金币把','金币把:7')
-            command('.dh gm','GM：UI:1003')
+            command('.st show 金币把','金币：7 把')
+            # This synthetic second user has no platform message history; restore its
+            # nickname fixture only after checking the persisted GM/Fear state.
+            persisted_gm=command('.dh gm','恐惧1/12')
+            assert 'UI:1003' not in persisted_gm,persisted_gm
             command('.smokegm','GM卡恐惧=1;存在=true')
+            command('.dh gm','GM：本地GM ｜ 恐惧1/12')
         step('/package/uninstall',data={'id':package_id,'mode':'full'})
         step('/js/reload',data={})
         assert '掷骰' not in command('.dd +2')

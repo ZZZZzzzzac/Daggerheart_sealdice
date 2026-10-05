@@ -1,62 +1,51 @@
-# PbDH 外部 iForm 实验
+# PbDH iframe接入
 
-独立路线：Seal/sealpack 工作树 codex/pbdh-iframe-sync；PbDH 工作树 codex/sealchat-iframe-sync。本地实验 sealpack 为0.4.12；已发布0.4.7和 PbDH main 均不修改、不发布。SealChat/Dice 使用未修改的官方二进制，不补丁、不重新编译宿主。
+正式功能：Seal master、PbDH main，sealpack0.5.0。采用官方未修改Chat/Dice，通过Channel Embed SDK接入。旧HTML人物卡与Dice经历协议已删除；规则YAML继续用于.set dh、属性别名及.st。
 
-## 数据职责
+## 数据与保存
 
-PbDH 当前 Character Save 保存属性、经历、武器、职业、闪避、阈值及资源。iframe 是完整 Platform Shell，登录、格式导入、本地存档和云端存档都复用正常流程。Dice 保留联动资源副本、DHPbDH来源 存档 UUID 和 DHPbDH姓名 昵称确认标记；除闪避、重伤阈值、严重阈值供世界徽标显示外，其他基础属性、经历不再覆盖页面或写入 Dice。
+PbDH当前Character Save保存属性、经历、武器、职业、资源与闪避/阈值。iframe是完整Platform Shell，账号、各种格式导入、本地/云端存档与市场沿用普通网页流程。Dice保存资源副本、徽标及DH来源/DH姓名确认标记，其他基础数据不写Dice。
 
-明确点击“关联并使用 PbDH 资源”时，通过实验 .dh pbdh 接收直接可读的中文 JSON（仍兼容旧 URI 编码指令），将当前存档的生命、压力、护甲槽、希望、金币以及资源上限初始化到 Dice，人物昵称采用 PbDH character-name 字段。空白姓名回退为未命名角色；姓名保留空格、连字符和引号。sealpack 先检查完整字段、UUID、姓名及资源范围，再使用官方插件变量和上下文字段写入，避免 .st 开头 UUID 被识别为人物名并拆成运算。昵称更新遵循官方玩家保存标记；不操作人物卡管理器或改写绑卡元数据。传输使用官方 rawArgs 保留姓名中的连续空格、引号、百分号和 -- 字样；仅对 <、>、& 作 JSON 字符转义，避免被聊天标记解释。整串 JSON 校验，拒绝尾随指令。消息回执不代表执行；回读来源 UUID、姓名标记和相应资源字段确认后才进入已关联状态。按钮仍发相对 .st；PbDH 原生编辑或依赖计算引起的资源修改只发送变化字段，并保留同时到达的其他 Dice 资源变化。
+首次明确点击“关联”通过.dh pbdh中文JSON初始化四项资源/上限、金币把/袋/箱、闪避、重伤阈值、严重阈值和当前玩家昵称。JSON仅转义<、>、&以免被聊天解释，官方rawArgs保留姓名空格/引号/百分号/--。先完整校验再写，回读来源/姓名/所有字段确认后关联；消息回执不是执行成功。
 
-闪避、重伤阈值、严重阈值在关联时初始化到 Dice；之后比较当前 PbDH 与 Dice 数值，自动发送变化的 .st 字段并回读确认。三项单向以 PbDH 为准，不反写存档；缺失或非法值停止关联，不当作0。旧的仅资源初始化消息保持兼容。
+资源按变化字段.st同步，按钮用相对增减；徽标字段单向以PbDH为准。Dice确认结果通过Runtime.updateModuleValue更新，再沿用250ms本地保存与现有云outbox，等待期间较新的本地修改保留，不另设写云端按钮。金币边界9把/9袋/1箱，不自动换算；零与未知分开处理。
 
-Dice 结算或聊天资源命令的确认结果通过 Runtime.updateModuleValue 更新当前人物。沿用250ms自动本地保存及已关联云文档的 outbox，不另建“写回云端”按钮。护甲槽上限同时更新 PbDH 护甲值。重复回读不重复保存或反向发送，等待确认期间的较新本地编辑不被旧结果覆盖。非法、缺失或超出 PbDH 资源边界的数据停止关联，不污染人物存档。
+关闭重开或断线后用“重连”，核对DH来源/DH姓名及权限，只读取Dice当前资源，不发.dh pbdh。标记不匹配不自动初始化。旧DHPbDH标记升级后需关联一次；改存档也须重新关联。iframe先等账号恢复再恢复所选人物缓存。
 
-六特质和主副武器保留独立 🎲 按钮；属性仍使用 PbDH 原生编辑，皮肤和布局保持现有系统包。掷骰助手读取当前 PbDH 属性和经历，修正直接加入数值表达式，例如 .dd 3+2 hope=1 -- 知识 · 世界旅行者。费用由 sealpack 在同一次操作中校验、扣除、结算奖励并沿用消息去重和恢复。掷骰消息仅含公式、费用和原因，不再附加 pbdh=UUID。桥接层发送前通过官方读卡核对 DHPbDH来源；实验 sealpack 兼容旧参数，但新指令的来源核对发生在发送前，不能使读卡与发送原子化。原生非 iframe 卡的 DH经历/exp 协议继续兼容。
+## 掷骰
 
-武器助手仍只有熟练值、伤害骰大小、固定调整值三个输入框，扫描第一个 d/D 骰子条目，支持空格、多位数字和不同摘要格式。公式如 .r 3d6+3 改良巨杖；无法识别名字时回退主/副武器。DamageAdjustment 是显式因素接口，不自动解读特性自然语言。发送前核对武器与熟练值快照。
+六特质和主副武器用独立🎲按钮，原属性点击继续编辑，保留系统包皮肤/布局。经历留在PbDH，助手生成数值公式，例如.dd 3+2 hope -- 知识 · 世界旅行者；hope/hope1花费1，hope2花费2，0–5。费用与资源收益由sealpack一次结算，复用去重与.dh recover。
 
-## 本地试用
+不发送pbdh=或exp=。桥接发送前通过官方SDK读卡核对DH来源，但读卡到发送不是原子操作。海豹骰导出仅数字快照；其他平台经历手动转成修正与hope费用。
 
-官方 Chat 18760、官方 Dice 18761、实验 PbDH 18762。18762 的 Vite preview 使用 PBDH_API_PROXY_TARGET=https://daggerheart.cn，Supabase 认证及既有云存档、媒体继续通过正式 PbDH API；18763 合成验收后端保持停止。不得经18762创建或回收合成云文档。
+武器助手保留熟练值、伤害骰大小、固定调整值三输入，从d/D开始扫描伤害条目，不依赖分隔符；公式如.r 3d6+3 改良巨杖。名字识别失败回退主/副武器，DamageAdjustment接口保留，不自然语言推断特性。发送前核对武器/熟练值快照。
 
-1. 在现有 Chat 中重新加载 iframe，登录并选择想使用的 PbDH 存档。
-2. 首次使用时核对 PbDH/Dice 名称，点击“关联并使用 PbDH 资源”，将当前 PbDH 资源和人物昵称写入本地实验 Dice。关闭重开后点击“刷新 / 重连”，会核对 Dice 保存的来源 UUID 与姓名，只读取当前 Dice 资源恢复同步，不发送 .dh pbdh；标记不匹配、资源无效或无权限则拒绝，不自动初始化。
-3. 通过 🎲 使用掷骰助手，或操作资源按钮；资源结果回读后自动保存，现有云文档自动同步。
-4. 切换 PbDH 存档后重新关联，旧人物的资源结果不会写进新存档。
+## 本地与上线
 
-重新打开 iframe 时，首次启动先等待账号恢复，再读取原有当前人物选择及本地缓存，避免匿名列表覆盖上次选中的云端卡。继续使用正常 PbDH 的本地与云端存档，不建立额外缓存库。关闭窗口结束 Dice 同步会话；重开会恢复所选卡，通过“刷新 / 重连”继续现有会话。重连采用 Dice 当前资源，保留读取期间较新的本地编辑，之后继续正常资源与徽标同步；旧关联缺失徽标数值时只用普通 .st 补齐。主动以 PbDH 当前资源重新初始化仍使用“关联并使用 PbDH 资源”。
+本地官方Chat18760、Dice18761、PbDH18762。PbDH代理指向正式账号API，使用真实Supabase；不得经此端口创建合成云资料。隔离SDK预览另用合成数据，仅记录命令。
 
-资源市场、玩家车卡器等同源页面导航，以及市场安装交接，保留入口的 sealchat、hostOrigin、sdkUrl 三个参数；不携带旧的市场查询或交接数据，不向外站传播。返回 Player 后实验面板仍可用。“与海豹聊天连接”位于玩家功能菜单最末；点击可重新打开已收起的面板并尝试重连，不发送初始化。连接工具条仅显示人物、状态及关联/暂停/重连操作，正常状态不显示说明段落；独立网页中该菜单只说明需要从 SealChat 嵌入人物卡进入。
+同源Market/Player导航保留sealchat、hostOrigin、sdkUrl，不传给外站，不沿用旧交接查询。“与海豹聊天连接”在玩家功能菜单最末，恢复工具条并尝试重连，不初始化。
 
-纯本地旧存档仍需沿用正常“同步到云”入口启用一次。云端已有不同修订时使用原有冲突处理；这不是多窗口实时共享编辑。账号单活动会话、离线 outbox 和格式导入边界都保持 PbDH 正常行为。
+官方Embed需context.read、characters.read、characterCard.read、messages.send，URL为PbDH/player并带sealchat=1、hostOrigin及同源官方sdkUrl。使用直接iframe和840×790默认窗口，约A4宽触发窄屏，手动宽度由外层宿主窗口控制。
 
-## iForm 配置与静态验收
+部署需升级同一个sealpack、部署PbDH前端并配置正确allowedOrigins/SDK权限，停用旧HTML显示配置，保留Dice规则模板。不需要新增账号或数据库schema。正式域名响应头、登录、云存档及跨页面连接还须上线验收。
 
-npm run build:pbdh-embed -- https://your-pbdh.example/pbdh/player/daggerheart-core 生成 iframe.html、bridge-policy.json、presentation.json。宿主配置必须为直接外部 iframe，开启 Embed API 并授予 context.read、characters.read、characterCard.read、messages.send；hostOrigin/sdkUrl 由宿主注入并校验同源。默认浮窗840×790，iframe随拖动缩放，沿用 PbDH 窄屏模式将桌面移到下方。
+未关联时页面仍按PbDH普通方式保存。纯本地人物沿用原“同步到云”入口启用一次，云修订冲突用原解决界面。关闭iframe停止10秒资源回读；跨平台/账号的人物卡不自动共享资源。完整去重/恢复边界见../../docs/CHARACTER_STATE.md。
 
-npm run preview:pbdh-embed -- <PbDH apps/platform/dist> <固定官方SDK路径> 提供隔离 SDK 协议夹具，--same-origin 仅供浏览器工具验收。夹具初始化与步进模拟资源保存，只记录投骰请求，不冒充真实掷骰或扣费，不接正式云端。
+## 正式部署与频道安装
 
-未标记规则类型的活动卡允许显式关联；实验 .dh pbdh 在资源写入前仍校验当前群规则为 daggerheart，未启用时在聊天发送 .set dh 后重试。原生 .st 将空类型补成 daggerheart/dh 时保持关联，已有其他规则类型的卡拒绝初始化。登录、断线、发送权限、卡规则类型和 SDK 授权分别显示具体提示。characters.read 用于读取当前消息身份并在切换时停止旧草稿；官方 characterCard.getCurrent 读取当前账号的 Dice 活动卡，场内/场外角色并不各自创建独立 Dice 卡。
+1. Dice安装/更新豹仓zac/daggerheart 0.5.0，启用扩展。频道连接Dice Bot并选择匕首之心规则（.set dh）。
+2. 部署包含此接入的PbDH前端。本站由PbDH GitHub Release构建并部署到https://daggerheart.cn/pbdh/；不需要新数据库、独立后端或Chat/Dice二进制。
+3. 在SealChat频道新建嵌入窗/iForm，粘贴下面的HTML。使用能启用Embed API的频道嵌入窗；旧HTML人物卡模板停用。
+4. 开启Embed API，allowedOrigins填写https://daggerheart.cn，授予context.read、characters.read、characterCard.read、messages.send。设置默认宽840、高790、浮动窗口。宿主自动追加hostOrigin及包含/chat前缀的sdkUrl，不手工固定到某个聊天实例。
+5. 玩家打开嵌入窗，登录自己的PbDH账号，选择人物存档，点击关联；之后关闭重开可重连。每个玩家仍读取和操作自己的Dice活动人物卡。
 
-切换身份、频道、卡名、其他规则类型、存档或来源标识，以及断线，均停止关联。官方接口缺少稳定 Dice 卡 ID、原子 expectedCardId 和属性版本比较；初始化与 .st 调整没有严格外部并发保证，已经发送的消息不能撤销。读卡与约10秒轮询用于资源确认，超时/未知请求不自动重发。
+```html
+<iframe src="https://daggerheart.cn/pbdh/player/daggerheart-core?sealchat=1" title="PbDH 匕首之心人物卡" width="840" height="760" sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups" referrerpolicy="no-referrer" style="position:absolute;inset:0;display:block;width:100%;height:100%;border:0"></iframe>
+```
 
-测试与部署：专用初始化协议已补充零资源、完整姓名、非法字段拒绝与回读确认测试，并用未修改的官方1.6.1验证 .st show、数值公式、费用、来源和重载。本地实验已使用0.4.12；完整 iframe 联动需要包含 .dh pbdh 和 hope=费用 的新版 sealpack。正式云端仍沿用现有存档和认证流程，不创建或回收合成云文档；未部署或发布到生产。
+从项目根目录运行npm run build:pbdh-embed可生成同一HTML、bridge-policy.json和presentation.json；后两个文件用于对照宿主设置，无须上传到服务器。其他PbDH站点可把Player URL作为参数传入构建命令，并使用对应origin。
 
+本站的Chat位于/chat/，官方SDK为/chat/api/v1/channel-embed-sdk.js。与PbDH同源，当前Nginx路由即可提供iframe及SDK，无须新增反代或放宽跨站策略。其他站点部署需检查frame-ancestors/X-Frame-Options与HTTPS；只允许实际使用的工具origin。
 
-## 与传统人物卡和手动掷骰的兼容
-
-共用同一个 zac/daggerheart sealpack。传统 .dd/.ddr 的数值算式、属性名、adv/dis、dc、原因、DH经历/exp 以及 .st、GM、恢复协议继续保留；普通掷骰不要求 iframe、PbDH 登录、Supabase 或人物关联。新加的 hope=费用 是可选的临时参数，手动输入也可使用；非零费用要求 Dice 当前卡已录入足够希望。三行回复对所有入口统一生效，粗体呈现取决于聊天平台的文本渲染；希望结算现在读取已录入的希望上限，未录入时仍默认6。
-
-主线0.4.7不能完成本实验的关联和独立费用协议，不能只替换 iframe URL 而保留旧 sealpack。新版对传统命令保留兼容，原有六特质与 DH经历 数据不删除、不要求迁移。现有 HTML 卡仍可用其原协议调用新版包；切换后可停用该界面。SealChat 的 HTML 展示模板与 SealDice 的 daggerheart 规则 YAML 是不同用途，后者继续用于 .set dh、属性别名和原生 .st，不能随 HTML 卡一起移除。
-
-数据同步与命令兼容分别处理。iframe 从 PbDH 当前存档生成数值公式，按希望费用结算，不自动把六特质或经历写入 Dice；在其他平台输入 .dd 知识，仍读取那个平台/账号/频道的 Dice 当前卡，可能是已有快照或模板默认值。传统用户可继续通过 PbDH“导出海豹骰”主动录入属性和经历，或者直接输入 .dd 3+2 hope=1 adv dc15 -- 知识 · 世界旅行者。导出是快照更新，不改成 iframe 每次掷骰前的整卡写入，也不保证不同平台的 Dice 卡自动共用数据。
-
-## 切换到 iframe 路线
-
-1. 合并并部署 PbDH 实验前端：保留 sealchat=1 的可选接入、SDK 连接、存档恢复、市场导航、掷骰助手和原有 Runtime 保存/云同步。普通网页继续使用正常模式，不需要新增账号库、存档库或数据库 schema。
-2. 在 Dice 升级同一 sealpack，保留独立手动 .dd/.ddr、原生 .st、DH经历、GM 与恢复功能。测试后的正式版本另行发布；当前0.4.12仅本地实验。
-3. 在未修改的 SealChat 配置官方 Embed/iForm：正式 PbDH URL、准确的 allowedOrigins、context.read / characters.read / characterCard.read / messages.send 权限；使用直接 iframe 和840×790默认窗口。正式域名仍需验收嵌入响应头、登录、云存档与跨页面连接。
-4. 停用当前 HTML 人物卡展示配置，保留 Dice 规则模板。首次关联前核对 PbDH 的资源，因为初始化会写入 Dice；已有匹配标记时用重连读取 Dice 当前资源。其他平台需要具名属性掷骰的用户按需导出一次快照。
-
-这份切换清单是后续上线步骤，不代表已合并主线、上传豹仓或部署生产。关闭 iframe 结束资源回读，约10秒轮询与读卡到发送的非原子边界沿用上面的限制。
+用户应尽量从与平时PbDH相同的域名打开iframe，便于沿用浏览器本地存档和账号会话。daggerheart.cn与pbdh.top虽然服务器相同，浏览器本地存储仍不同；云存档通过原账号同步。

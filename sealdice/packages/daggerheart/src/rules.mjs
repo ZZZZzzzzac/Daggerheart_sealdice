@@ -1,4 +1,3 @@
-import {parseExperienceToken} from './experiences.mjs';
 import {canonicalField} from './fields.mjs';
 // Only .dd options are parsed here; arithmetic belongs to the host .r engine.
 export function parseRequest(args, reaction = false) {
@@ -11,17 +10,11 @@ export function parseRequest(args, reaction = false) {
   let depth = 0, quote = '', escaped = false;
   for (const raw of tokens) {
     let match;
-    if (!depth && !quote && raw.startsWith('exp=')) {
-      if (request.experiences) throw Error('经历只能选择一次');
-      request.experiences = parseExperienceToken(raw);
-    } else if (!depth && !quote && raw.startsWith('hope=')) {
+    if (!depth && !quote && /^hope(?:$|[=0-9])/i.test(raw)) {
       if (request.hopeCost !== undefined) throw Error('希望费用只能指定一次');
-      if (!/^hope=[0-5]$/.test(raw)) throw Error('希望费用须为0–5的整数');
-      request.hopeCost = Number(raw.slice(5));
-    } else if (!depth && !quote && raw.startsWith('pbdh=')) {
-      if (request.pbdh) throw Error('PbDH 关联只能指定一次');
-      if (!/^pbdh=[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(raw)) throw Error('PbDH 存档标识无效');
-      request.pbdh = raw.slice(5);
+      const cost = /^hope([0-5]?)$/i.exec(raw);
+      if (!cost) throw Error('希望费用须为hope或hope0至hope5，不使用等号');
+      request.hopeCost = Number(cost[1] || 1);
     } else if (!depth && !quote && (match = /^(adv|优势|优|dis|劣势|劣)(\d*)$/i.exec(raw))) {
       const count = Number(match[2] || 1);
       if (!Number.isSafeInteger(count) || count < 1 || count > 20) throw new Error('优劣势来源数须为1–20');
@@ -45,7 +38,6 @@ export function parseRequest(args, reaction = false) {
       }
     }
   }
-  if (request.experiences && request.hopeCost !== undefined) throw Error('经历编号与希望费用不能同时指定');
   request.expression = parts.join(' ').trim();
   return request;
 }
@@ -76,17 +68,16 @@ export function rollRequest(request, rollDie, evaluateExpression = () => ({ valu
   return { request, hope, fear, expression: evaluated.expression || request.expression, modifier, advantage, total, critical, withHope, success, effects };
 }
 
-export function formatRoll(result, name, hints = true, experiences = []) {
+export function formatRoll(result, name, hints = true) {
   const { request, hope, fear, total, critical, withHope, success, advantage, modifier, effects } = result;
   const polarity = withHope ? '希望' : '恐惧';
-  const outcome = critical ? '✨【关键成功】' : success === null ? `◆【${polarity} · 成败待定】`
+  const outcome = critical ? '✨【关键成功】' : success === null ? `◆【${polarity}结果】`
     : `${success ? '✅' : '❌'}【${polarity}${success ? '成功' : '失败'}】`;
   const traits = [...new Set((request.expression.match(/[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*/g) || [])
     .map(canonicalField).filter(key => ['敏捷','力量','灵巧','本能','风度','知识'].includes(key)))];
   const net = request.advantages - request.disadvantages;
   const edge = net > 0 ? '优势' : net < 0 ? '劣势' : request.advantages ? '优劣势抵消' : '普通';
   const labels = [`【${name}】${request.reaction ? '反应掷骰' : '动作掷骰'}`, ...traits,
-    experiences.length ? '经历：' + experiences.map(item => item.name + '(' + (item.modifier >= 0 ? '+' : '') + item.modifier + ')').join('、') : '',
     request.reason, edge].filter(Boolean);
   // 保留实际面值的海豹注解，供固定 SealChat 公开解析器生成 3D 骰子。
   let expression = `希望${hope}[1d12]+恐惧${fear}[1d12]`;
@@ -106,8 +97,14 @@ export function formatRoll(result, name, hints = true, experiences = []) {
 export function formatSettlement(before, after, fearBefore, fearAfter, effects, hopeMaximum = 6) {
   const fields = [];
   const change = (label, a, b, cap) => a === b ? `${label}${b}/${cap}` : `${label}${a}→${b}`;
-  if (effects.hopeGain || effects.hopeSpend) fields.push(change('希望', before.希望, after.希望, hopeMaximum));
+  if (effects.hopeGain || effects.hopeSpend) {
+    const overflow = Math.max(0, before.希望 - (effects.hopeSpend || 0) + effects.hopeGain - hopeMaximum);
+    fields.push(change('希望', before.希望, after.希望, hopeMaximum) + (overflow ? `（溢出${overflow}点）` : ''));
+  }
   if (effects.stressClear) fields.push(before.压力 === after.压力 ? `压力${after.压力}` : `压力${before.压力}→${after.压力}`);
-  if (effects.fearGain) fields.push(change('恐惧', fearBefore, fearAfter, 12));
+  if (effects.fearGain) {
+    const overflow = Math.max(0, fearBefore + effects.fearGain - 12);
+    fields.push(change('恐惧', fearBefore, fearAfter, 12) + (overflow ? `（溢出${overflow}点）` : ''));
+  }
   return fields.join(' ｜ ');
 }

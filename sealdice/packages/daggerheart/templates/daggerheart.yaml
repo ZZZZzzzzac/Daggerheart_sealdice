@@ -1,9 +1,9 @@
 name: daggerheart
 fullName: 匕首之心正式版核心
 authors: [Daggerheart workspace]
-version: 0.4.7
+version: 0.5.0
 templateVer: "2.0"
-updatedTime: "2026-10-03"
+updatedTime: "2026-10-05"
 attrs:
   defaults: {}
   defaultsComputed:
@@ -19,7 +19,6 @@ attrs:
     压力: "null"
     护甲: "null"
     恐惧: "null"
-    金币: "null"
     金币把: "null"
     金币袋: "null"
     金币箱: "null"
@@ -43,13 +42,13 @@ alias:
   护甲: [armor]
   希望: [hope]
   恐惧: [fear]
-  金币: [gold]
   金币把: [把]
   金币袋: [袋]
   金币箱: [箱]
   生命上限: [hpMax]
   压力上限: [stressMax]
   护甲上限: [armorMax]
+  希望上限: [hopeMax]
 commands:
   set:
     diceSides: "20"
@@ -59,7 +58,7 @@ commands:
   sn: {}
   st:
     show:
-      top: [敏捷, 力量, 灵巧, 本能, 风度, 知识, 生命, 压力, 护甲, 希望, 恐惧, 金币把, 金币袋, 金币箱]
-      ignores: [DH经历, DH角色标识]
+      top: [敏捷, 力量, 灵巧, 本能, 风度, 知识, 生命, 压力, 护甲, 希望]
+      ignores: [DH角色标识, DH来源, DH姓名, 恐惧]
       sortBy: name
       itemsPerLine: 4

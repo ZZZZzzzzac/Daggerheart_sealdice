@@ -1,10 +1,9 @@
-# 匕首之心人物卡
+# 匕首之心iframe接入
 
-- 自有 HTML 人物卡从零实现，源码位于 character-sheet/src，单文件产物位于忽略的 character-sheet/dist。
-- 默认使用固定 reference/sealchat 的原生人物卡 HTML 协议；通过 ROLL_DICE 的 template 模式发送 .dd/.ddr/.st/.dh exp，不以整卡缓存写回。频道 iForm / Channel Embed 仅为可选入口，不是使用人物卡的前提。打开和回读不写 Dice 属性，不调用 UPDATE_ATTRS 或 characterCard.updateAttrs。
-- .st 导出提供六特质、资源及上限、闪避与阈值；没有字段时显示未知，不补默认值。
-- 生命、压力、护甲仍表示已标记数量，希望表示可用点数；均只显示数字，标签/数字/增减按钮放同一行。金币使用金币把/金币袋/金币箱三个字段，固定上限10/10/1，三张卡排同一行；不显示恐惧或任意附加字段。经历在PbDH编辑；PbDH“导出为海豹骰”携带最多5项经历名称/修正，其他参考资料和图片不导入，不展示种族、社群、职业、等级、装备、职业特性、卡牌、物品或笔记。
-- 经用户明确授权，经历作为版本化小型JSON字符串保存在Dice绑定卡DH经历，通过PbDH导出的.st写入；人物卡统一使用通用HTML，不生成角色专属模板，不用localStorage或Embed共享Storage保存经历。
-- 掷骰发送特质名和所选经历索引/内容版本，使用.dd/.ddr与adv/dis。经用户明确要求，每项经历自动消耗1希望；插件执行时读最新经历/希望，余额不足在投骰前拒绝，费用和收益纳入已有去重/恢复流程，不另发.st扣费。
-- 原生模板指令发往当前频道/聊天身份的绑定卡，不等于窗口展示卡；不能承诺原子绑定保护、跨设备去重、并发冲突检测或即时同步。可选 Embed 资料 Storage 只有频道/iForm 作用域，不是每玩家私有存储。
-- 遵守根 AGENTS.md 的二次开发硬约束：仅使用 SealChat 已提供的接口，不修改宿主源码、不制作或应用源码补丁、不重编译修改版宿主；development 工作副本也不例外。接口不足须说明限制并调整方案。reference 只读；生产部署另需用户明确要求。
+- 当前人物卡采用PbDH iframe，旧自有HTML人物卡和相关构建/测试已删除；历史由Git保留，不恢复为开发入口。
+- 只用官方Embed/iForm配置、Channel Embed SDK和sealpack，不修改宿主、不打补丁、不重新编译；reference固定只读。
+- PbDH保存完整人物数据，Dice保存资源副本与徽标。经历内联到数值公式，费用hope/hopeN；Dice不维护经历协议。
+- 接入使用context.read、characters.read、characterCard.read、messages.send，不调用整卡updateAttrs或内部API，不读取token。
+- .dh pbdh初始化DH来源/DH姓名、资源与徽标；重连仅回读。发送前核对当前存档/身份，不能宣称原子绑定、严格外部并发安全或即时推送。
+- 使用现有PbDH皮肤和布局，登录/导入/本地保存/云同步沿用原流程；不另建资料库或写云端按钮。
+- 本地预览与测试只用合成资料，不经正式云端创建测试文档；生产部署必须用户明确要求。
