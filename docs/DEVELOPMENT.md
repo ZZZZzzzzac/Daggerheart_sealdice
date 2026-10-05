@@ -14,7 +14,9 @@ SealChat使用sealchat/pbdh-embed官方Embed/iForm入口，人物卡代码在PbD
 
 npm test构建当前sealpack并测试规则、官方接口模拟、产物、费用、去重与恢复。模拟不替代真实Goja验收，测试数量以本次输出为准。PbDH修改完成后在其工作区运行npm run verify，包含完整前端/Python测试、类型检查与构建。
 
-产物为sealdice/packages/daggerheart/dist/daggerheart-版本.sealpack，构建白名单只含本项目脚本、模板、README与许可/商店素材。不提交依赖、产物、凭据、数据库或聊天日志。
+sealpack产物为sealdice/packages/daggerheart/dist/daggerheart-版本.sealpack，构建白名单只含本项目脚本、模板、README与许可/商店素材。依赖、sealpack构建产物、凭据、数据库和聊天日志不提交。
+
+经用户明确要求，sealchat/pbdh-embed/dist中的iframe.html、bridge-policy.json、presentation.json作为可直接使用的正式发布文件进入Git；这是构建产物忽略规则的限定例外。更新接入生成器后运行npm run build:pbdh-embed，检查默认正式URL与权限并提交对应产物。
 
 ## 官方宿主隔离验收
 

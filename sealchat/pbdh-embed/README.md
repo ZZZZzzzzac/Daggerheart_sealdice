@@ -44,7 +44,9 @@ PbDH当前Character Save保存属性、经历、武器、职业、资源与闪�
 <iframe src="https://daggerheart.cn/pbdh/player/daggerheart-core?sealchat=1" title="PbDH 匕首之心人物卡" width="840" height="760" sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups" referrerpolicy="no-referrer" style="position:absolute;inset:0;display:block;width:100%;height:100%;border:0"></iframe>
 ```
 
-从项目根目录运行npm run build:pbdh-embed可生成同一HTML、bridge-policy.json和presentation.json；后两个文件用于对照宿主设置，无须上传到服务器。其他PbDH站点可把Player URL作为参数传入构建命令，并使用对应origin。
+正式发布文件已随源码提交到GitHub，可直接下载[iframe.html](dist/iframe.html)、[bridge-policy.json](dist/bridge-policy.json)和[presentation.json](dist/presentation.json)。iframe.html粘贴到频道嵌入窗；两个JSON用于对照Embed API权限和默认窗口设置，无须上传到服务器。
+
+从项目根目录运行npm run build:pbdh-embed可重新生成这三个文件。修改生成器后应重新构建并一起提交默认正式域名的产物。其他PbDH站点可把Player URL作为参数传入构建命令，并使用对应origin；自定义域名的输出不要覆盖已提交的正式版本。
 
 本站的Chat位于/chat/，官方SDK为/chat/api/v1/channel-embed-sdk.js。与PbDH同源，当前Nginx路由即可提供iframe及SDK，无须新增反代或放宽跨站策略。其他站点部署需检查frame-ancestors/X-Frame-Options与HTTPS；只允许实际使用的工具origin。
 

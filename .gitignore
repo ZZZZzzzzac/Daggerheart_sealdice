@@ -3,6 +3,12 @@ reference/sealchat/
 reference/sealdice-core/
 reference/sealdice-ui/
 **/dist/
+# 正式 iframe 发布文件进入 Git，其他构建产物仍忽略。
+!/sealchat/pbdh-embed/dist/
+/sealchat/pbdh-embed/dist/*
+!/sealchat/pbdh-embed/dist/iframe.html
+!/sealchat/pbdh-embed/dist/bridge-policy.json
+!/sealchat/pbdh-embed/dist/presentation.json
 **/dev/
 **/runtime/
 **/coverage/

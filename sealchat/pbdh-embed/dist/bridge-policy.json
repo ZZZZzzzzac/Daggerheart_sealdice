@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "allowedOrigins": [
+    "https://daggerheart.cn"
+  ],
+  "capabilities": [
+    "context.read",
+    "characters.read",
+    "characterCard.read",
+    "messages.send"
+  ]
+}
